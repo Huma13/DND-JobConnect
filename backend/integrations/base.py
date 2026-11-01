@@ -40,3 +40,15 @@ class IJobSource(Protocol):
     platform: str
 
     def search(self, query: SearchQuery) -> list[RawPosting]: ...
+
+
+class CaptchaDetected(Exception):
+    """The site asked for a CAPTCHA. Automation must stop and hand over to the user (REQ-13)."""
+
+
+class SubmitError(Exception):
+    """An application or message could not be delivered."""
+
+
+class SubmitRateLimited(SubmitError):
+    pass
