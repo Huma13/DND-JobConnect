@@ -19,4 +19,6 @@ urlpatterns = [
     path("api/auth/", include("accounts.urls")),
     path("api/jobs/", include("matching.urls")),
     path("api/scheduler/", include("scheduler.urls")),
+    path("api/applications/", include("applications.urls")),
+    path("api/outreach/", include("outreach.urls")),
 ]
