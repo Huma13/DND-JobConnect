@@ -37,6 +37,8 @@ celery -A config beat -l INFO                          # separate terminal
 | `backend/scheduler/` | Business / Data | Celery tasks, beat schedules, rate limiter, run log |
 | `backend/accounts/` | Business | Minimal user model, JWT login, Pause All (the full auth story is separate) |
 | `backend/resume_parser/` | Business | `Profile` model read by matching (the parsing story is separate) |
+| `backend/applications/` | Business | Apply kit, assisted / career-page / email apply, confirmation gate, daily limits, attempt log, CAPTCHA pause |
+| `backend/outreach/` | Business | Recruiter suggestions, editable outreach drafts, daily limits, identical-message block |
 | `backend/loadtest/` | Testing | Locust scenarios and the 50-user degradation check |
 
 ## API (this increment)
@@ -72,6 +74,34 @@ All endpoints except register, login and health need `Authorization: Bearer <acc
   with the team before changing `COLLECTOR_RESPECT_ROBOTS`. The parsers are tested against saved fixtures either way.
 * **Pause All (SRS 6.2):** scheduled runs are skipped, manual searches are refused, and an in-flight run stops
   storing results as soon as the flag is seen.
+
+## Applying and outreach (issues #20-#31)
+
+All under `Authorization: Bearer <token>`. `feed_item` is an id from `/api/jobs/feed/`.
+
+| Method | Endpoint | Requirement |
+|---|---|---|
+| POST | `/api/applications/kits/` `{feed_item}` | REQ-9 kit; `GET .../kits/{id}/download/?part=resume\|cover_letter`, `PATCH .../kits/{id}/edit/` |
+| POST | `/api/applications/` `{feed_item, method: manual\|ats\|email, to_email?}` | #21 assisted (LinkedIn/Naukri), #22 Greenhouse/Lever, #23 email |
+| POST | `/api/applications/{id}/mark-applied/` | #21 track an application you made on the site |
+| GET | `/api/applications/{id}/review/` | REQ-10 content of the review popup |
+| POST | `/api/applications/{id}/submit/` `{confirmed: true}` | REQ-10 needs `confirmed` unless Full-Auto is on for that platform (else 428) |
+| GET/PUT | `/api/applications/limits/` `{platform, daily_limit, full_auto}` | REQ-11 default 20 a day per platform, over it gives 429 |
+| GET | `/api/applications/attempts/?status=` | REQ-12 every attempt with timestamp and success / failure / captcha |
+| GET | `/api/applications/notifications/` | REQ-13 CAPTCHA notices; the application becomes `manual_review_required` |
+| GET/PUT | `/api/applications/mailbox/` | Your own SMTP mailbox for email apply; password is write-only and stored encrypted |
+| GET | `/api/outreach/recruiters/?feed_item=` | REQ-14 recruiters with a reason and `best_channel` |
+| POST | `/api/outreach/messages/` `{recruiter, platform?}` | REQ-15 personalised draft; `PATCH .../messages/{id}/` to edit |
+| POST | `/api/outreach/messages/{id}/send/` | X message through the API |
+| POST | `/api/outreach/messages/{id}/mark-sent/` | LinkedIn note you sent yourself from the profile (`open_url`) |
+| GET/PUT | `/api/outreach/limits/` | REQ-16 default 15 a day per platform |
+
+* The same text sent to a second recipient is rejected with 409 (REQ-17); case and spacing are ignored.
+* A CAPTCHA response stops that application (no retry loop), sets `manual_review_required`, logs a `captcha`
+  attempt and creates a notification. Submitting again after you have dealt with it is allowed.
+* Pause All blocks submissions and outreach. Attempts and sent messages, not drafts, count toward the limits.
+* Config: `GREENHOUSE_API_KEY`, `LEVER_API_KEY` (career-page apply) and `X_API_KEY`, `X_API_SECRET`,
+  `X_ACCESS_TOKEN`, `X_ACCESS_SECRET` (X messages). Without them those channels report a clear error.
 
 ## Performance (issue #43, SRS 6.1)
 
