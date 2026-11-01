@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "accounts",
     "resume_parser",
+    "matching",
+    "scheduler",
 ]
 
 MIDDLEWARE = [
