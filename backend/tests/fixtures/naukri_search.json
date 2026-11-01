@@ -1,0 +1,30 @@
+{
+  "noOfJobs": 2,
+  "jobDetails": [
+    {
+      "jobId": "281025500123",
+      "title": "Machine Learning Engineer",
+      "companyName": "Razorpay Software Private Limited",
+      "jdURL": "/job-listings-machine-learning-engineer-razorpay-bengaluru-1-to-3-years-281025500123",
+      "createdDate": 1761800000000,
+      "tagsAndSkills": "Python,PyTorch,MLOps,SQL",
+      "jobDescription": "<p>Build and deploy <b>ML models</b> with Python and PyTorch.</p>",
+      "placeholders": [
+        {"type": "experience", "label": "1-3 Yrs"},
+        {"type": "salary", "label": "Not disclosed"},
+        {"type": "location", "label": "Bengaluru"}
+      ]
+    },
+    {
+      "jobId": "281025500456",
+      "title": "Data Analyst",
+      "companyName": "Infosys Limited",
+      "jdURL": "https://www.naukri.com/job-listings-data-analyst-infosys-pune-281025500456",
+      "createdDate": 1761900000000,
+      "tagsAndSkills": "SQL, Excel, Tableau",
+      "jobDescription": "Analyse data.",
+      "placeholders": [{"type": "location", "label": "Pune"}]
+    },
+    {"jobId": "", "title": "Broken row", "companyName": "X"}
+  ]
+}
