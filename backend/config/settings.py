@@ -35,6 +35,8 @@ INSTALLED_APPS = [
     "resume_parser",
     "matching",
     "scheduler",
+    "applications",
+    "outreach",
 ]
 
 MIDDLEWARE = [
@@ -117,6 +119,15 @@ COLLECTOR_USER_AGENT = env(
 )
 COLLECTOR_RESPECT_ROBOTS = env("COLLECTOR_RESPECT_ROBOTS", "1") == "1"
 COLLECTOR_MIN_DELAY_SECONDS = float(env("COLLECTOR_MIN_DELAY_SECONDS", "3"))
+# Application Manager (issues #20-#27) and Recruiter Outreach (#28-#31).
+GREENHOUSE_API_KEY = env("GREENHOUSE_API_KEY", "")
+LEVER_API_KEY = env("LEVER_API_KEY", "")
+X_API_KEY = env("X_API_KEY", "")
+X_API_SECRET = env("X_API_SECRET", "")
+X_ACCESS_TOKEN = env("X_ACCESS_TOKEN", "")
+X_ACCESS_SECRET = env("X_ACCESS_SECRET", "")
+APPLICATION_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
 SOURCE_TIMEOUT_SECONDS = 20          # per source; whole search stays under the 30 s target (SRS 6.1)
 
 # ---- Rate limits (REQ-19) --------------------------------------------------
