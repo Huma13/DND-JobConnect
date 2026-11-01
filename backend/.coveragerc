@@ -1,0 +1,4 @@
+[run]
+omit = */migrations/*, manage.py, config/asgi.py, config/wsgi.py, tests/*, loadtest/*
+[report]
+exclude_lines = pragma: no cover
