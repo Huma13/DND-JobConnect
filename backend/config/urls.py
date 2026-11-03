@@ -21,4 +21,5 @@ urlpatterns = [
     path("api/scheduler/", include("scheduler.urls")),
     path("api/applications/", include("applications.urls")),
     path("api/outreach/", include("outreach.urls")),
+    path("api/resume/", include("resume_parser.urls")),
 ]
