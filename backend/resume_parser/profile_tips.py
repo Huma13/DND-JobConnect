@@ -11,7 +11,7 @@ web framework and return `.to_dict()` as JSON.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 
 STOPWORDS = set("""
 a an the and or but if of to in on at by for with from as is are was were be been being it its this that these those
@@ -56,13 +56,16 @@ def _candidate_phrases(text: str, exclude: frozenset[str] = frozenset()) -> set[
     Bigrams never span a comma, period or bullet, so "microservices, REST"
     does not produce a false phrase.
     """
+    def is_ok(token: str) -> bool:
+        return _is_keyword_token(token) and token not in exclude
+
     phrases: set[str] = set()
     for segment in _SEGMENT_RE.split(text):
         tokens = _tokenize(segment)
-        ok = lambda t: _is_keyword_token(t) and t not in exclude
-        phrases.update(t for t in tokens if ok(t))
-        for a, b in zip(tokens, tokens[1:]):
-            if ok(a) and ok(b):
+        phrases.update(t for t in tokens if is_ok(t))
+        for i in range(len(tokens) - 1):
+            a, b = tokens[i], tokens[i + 1]
+            if is_ok(a) and is_ok(b):
                 phrases.add(f"{a} {b}")
     return phrases
 
@@ -128,7 +131,9 @@ def generate_profile_tips(
         tips.notes.append("Add at least one target job posting to get keyword tips.")
         return tips
     if len(postings) < 3:
-        tips.notes.append("Only %d posting(s) analyzed; tips get more reliable with 5 or more." % len(postings))
+        tips.notes.append(
+            f"Only {len(postings)} posting(s) analyzed; tips get more reliable with 5 or more."
+        )
     if not resume_text.strip():
         tips.notes.append("No resume text found. Upload a resume first (see #9 and #13).")
 
