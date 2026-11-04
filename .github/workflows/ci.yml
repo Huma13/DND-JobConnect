@@ -1,4 +1,5 @@
 # Issue #6: every PR is built and tested; merging to main deploys.
+# Issue #7: SonarQube analyses every build and fails it on a bad quality gate.
 name: CI
 
 on:
@@ -35,6 +36,9 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
+        with:
+          # SonarQube needs the full history to tell which code is new.
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -51,6 +55,15 @@ jobs:
         with:
           name: coverage
           path: backend/coverage.xml
+      - name: SonarQube scan (fails the build if the quality gate fails)
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # Leave the SONAR_HOST_URL variable unset to use SonarCloud.
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+        with:
+          projectBaseDir: backend
+          args: -Dsonar.qualitygate.wait=true
 
   docker:
     runs-on: ubuntu-latest
