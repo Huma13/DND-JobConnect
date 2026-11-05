@@ -389,3 +389,95 @@ def test_pause_all_blocks_submission(api):
     api.post("/api/auth/pause/", {"paused": True}, format="json")
     r = api.post(f"/api/applications/{app['id']}/submit/", {"confirmed": True}, format="json")
     assert r.status_code == 409
+
+
+# ---- #35 Application statistics ------------------------------------------------
+
+@pytest.mark.django_db
+def test_statistics_returns_total_platform_and_status_counts(api):
+    start(api, make_item(api.user, platform="naukri", ext="stats1"))
+    start(api, make_item(api.user, platform="linkedin", ext="stats2"))
+    third = start(api, make_item(api.user, platform="naukri", ext="stats3"))
+    api.post(f"/api/applications/{third.data['id']}/mark-applied/")
+
+    response = api.get(
+        "/api/applications/statistics/?start_date=2020-01-01&end_date=2099-12-31"
+    )
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 3
+    assert {item["platform"]: item["count"] for item in response.data["by_platform"]} == {
+        "naukri": 2,
+        "linkedin": 1,
+    }
+    assert {item["status"]: item["count"] for item in response.data["by_status"]} == {
+        "draft": 2,
+        "applied": 1,
+    }
+
+
+
+@pytest.mark.django_db
+def test_statistics_filters_by_date_range(api):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    first = start(api, make_item(api.user, ext="date1"))
+    start(api, make_item(api.user, ext="date2"))
+
+    old_app = Application.objects.get(pk=first.data["id"])
+    Application.objects.filter(pk=old_app.pk).update(
+        created_at=timezone.now() - timedelta(days=10)
+    )
+
+    response = api.get(
+        "/api/applications/statistics/?start_date=2020-01-01&end_date=2099-12-31"
+    )
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 2
+
+    response = api.get(
+        f"/api/applications/statistics/?start_date={(timezone.now().date() - timedelta(days=2)).isoformat()}&end_date=2099-12-31"
+    )
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 1
+
+
+@pytest.mark.django_db
+def test_statistics_are_private_to_each_user(api):
+    from .conftest import make_user
+
+    other = make_user("other-stats@pes.edu")
+    start(api, make_item(api.user, ext="private1"))
+
+    other_item = make_item(other, ext="private2")
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    other_api = APIClient()
+    other_api.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(other).access_token}"
+    )
+    other_api.post("/api/applications/", {"feed_item": other_item.pk}, format="json")
+
+    response = api.get(
+        "/api/applications/statistics/?start_date=2020-01-01&end_date=2099-12-31"
+    )
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 1
+
+
+@pytest.mark.django_db
+def test_statistics_requires_valid_date_range(api):
+    missing = api.get("/api/applications/statistics/")
+    invalid = api.get(
+        "/api/applications/statistics/?start_date=invalid&end_date=2099-12-31"
+    )
+    reversed_dates = api.get(
+        "/api/applications/statistics/?start_date=2026-12-31&end_date=2026-01-01"
+    )
+
+    assert missing.status_code == 400
+    assert invalid.status_code == 400
+    assert reversed_dates.status_code == 400
