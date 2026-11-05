@@ -3,7 +3,13 @@ import pytest
 import responses
 from django.core import mail
 
-from applications.models import Application, ApplicationAttempt, MailboxConfig, Notification
+from applications.models import (
+    Application,
+    ApplicationAttempt,
+    ApplicationStatusHistory,
+    MailboxConfig,
+    Notification,
+)
 from integrations.ats import GreenhouseAdapter, LeverAdapter, detect_ats, get_ats_adapter
 from integrations.base import CaptchaDetected, SubmitError
 from matching.models import FeedItem, JobPosting
@@ -389,3 +395,85 @@ def test_pause_all_blocks_submission(api):
     api.post("/api/auth/pause/", {"paused": True}, format="json")
     r = api.post(f"/api/applications/{app['id']}/submit/", {"confirmed": True}, format="json")
     assert r.status_code == 409
+
+
+# ---- #36 Manual application status change -----------------------------------
+
+@pytest.mark.django_db
+def test_manual_status_change_is_saved_with_history(api):
+    item = make_item(api.user)
+    app = start(api, item).data
+
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "applied"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "applied"
+
+    history = ApplicationStatusHistory.objects.get(application_id=app["id"])
+    assert history.old_status == "draft"
+    assert history.new_status == "applied"
+    assert history.user == api.user
+
+
+@pytest.mark.django_db
+def test_manual_status_change_same_status_does_not_create_history(api):
+    item = make_item(api.user)
+    app = start(api, item).data
+
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "draft"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert ApplicationStatusHistory.objects.filter(application_id=app["id"]).count() == 0
+
+
+@pytest.mark.django_db
+def test_manual_status_change_rejects_invalid_status(api):
+    item = make_item(api.user)
+    app = start(api, item).data
+
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "invalid"},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert ApplicationStatusHistory.objects.filter(application_id=app["id"]).count() == 0
+
+
+@pytest.mark.django_db
+def test_user_cannot_change_another_users_application(api):
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    from .conftest import make_user
+
+    other_user = make_user("other@example.com")
+    item = make_item(other_user, ext="foreign-36")
+
+    # Create an application belonging to the other user.
+    other_api = APIClient()
+    other_api.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(other_user).access_token}"
+    )
+    app = start(other_api, item).data
+
+    # Try changing it using the original user's API client.
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "applied"},
+        format="json",
+    )
+
+    assert response.status_code == 404
+    assert ApplicationStatusHistory.objects.filter(
+        application_id=app["id"]
+    ).count() == 0

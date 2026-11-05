@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.http import HttpResponse
 from rest_framework import generics, mixins, serializers, status, viewsets
 from rest_framework.decorators import action, api_view
@@ -14,6 +15,7 @@ from .models import (
     APPLY_PLATFORMS,
     Application,
     ApplicationAttempt,
+    ApplicationStatusHistory,
     ApplyKit,
     MailboxConfig,
     Notification,
@@ -181,6 +183,34 @@ class ApplicationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixin
             app = services.mark_applied(app)
         except services.Blocked as exc:
             return _blocked(exc)
+        return Response(ApplicationSerializer(app).data)
+
+    @action(detail=True, methods=["patch"], url_path="change-status")
+    def change_status(self, request, pk=None):
+        """Allow the user to manually update an application's status (Issue #36)."""
+        app = self.get_object()
+        new_status = request.data.get("status")
+
+        valid_statuses = [choice[0] for choice in Application.Status.choices]
+
+        if new_status not in valid_statuses:
+            raise ValidationError({
+                "status": f"Invalid status. Choose one of: {', '.join(valid_statuses)}."
+            })
+
+        if new_status == app.status:
+            return Response(ApplicationSerializer(app).data)
+
+        with transaction.atomic():
+            ApplicationStatusHistory.objects.create(
+                application=app,
+                user=request.user,
+                old_status=app.status,
+                new_status=new_status,
+            )
+            app.status = new_status
+            app.save(update_fields=["status", "updated_at"])
+
         return Response(ApplicationSerializer(app).data)
 
 
