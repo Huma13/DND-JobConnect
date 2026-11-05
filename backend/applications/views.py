@@ -12,15 +12,12 @@ from resume_parser.models import Profile
 
 from . import services
 from .kit import build_kit, find_contact_email
-from .models import(
+from .models import (
     APPLY_PLATFORMS,
     Application,
     ApplicationAttempt,
-<<<<<<< HEAD
-    ApplicationStatusHistory,
-=======
     ApplicationResponse,
->>>>>>> 5390475 (Implement response rate tracking (Issue #37))
+    ApplicationStatusHistory,
     ApplyKit,
     MailboxConfig,
     Notification,
@@ -237,7 +234,6 @@ class ApplicationViewSet(
             return _blocked(exc)
         return Response(ApplicationSerializer(app).data)
 
-<<<<<<< HEAD
     @action(detail=True, methods=["patch"], url_path="change-status")
     def change_status(self, request, pk=None):
         """Allow the user to manually update an application's status (Issue #36)."""
@@ -265,7 +261,7 @@ class ApplicationViewSet(
             app.save(update_fields=["status", "updated_at"])
 
         return Response(ApplicationSerializer(app).data)
-=======
+
     @action(detail=True, methods=["get", "post"])
     def responses(self, request, pk=None):
         """REQ-23: View or record employer replies and interview invitations."""
@@ -340,7 +336,7 @@ class ApplicationViewSet(
                 for item in by_platform
             ],
         })
->>>>>>> 5390475 (Implement response rate tracking (Issue #37))
+
 
 
 class AttemptViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):

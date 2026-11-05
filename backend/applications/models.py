@@ -106,31 +106,6 @@ class MailboxConfig(models.Model):
     use_tls = models.BooleanField(default=True)
 
 
-
-class ApplicationStatusHistory(models.Model):
-    """Records every manual status change made to an application."""
-
-    application = models.ForeignKey(
-        Application,
-        on_delete=models.CASCADE,
-        related_name="status_history",
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="application_status_changes",
-    )
-    old_status = models.CharField(max_length=30, choices=Application.Status.choices)
-    new_status = models.CharField(max_length=30, choices=Application.Status.choices)
-    changed_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["-changed_at", "-id"]
-
-    def __str__(self):
-        return f"Application {self.application_id}: {self.old_status} -> {self.new_status}"
-
-
 class ApplicationStatusHistory(models.Model):
     """Records every manual status change made to an application."""
 
