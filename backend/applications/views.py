@@ -1,3 +1,4 @@
+from django.db.models import Count
 from django.http import HttpResponse
 from rest_framework import generics, mixins, serializers, status, viewsets
 from rest_framework.decorators import action, api_view
@@ -121,6 +122,46 @@ class ApplicationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixin
         if "status" in self.request.query_params:
             qs = qs.filter(status=self.request.query_params["status"])
         return qs
+    @action(detail=False, methods=["get"])
+    def statistics(self, request):
+        """Issue #35: application counts by platform and status for a date range."""
+        from django.utils.dateparse import parse_date
+
+        start_date = parse_date(request.query_params.get("start_date", ""))
+        end_date = parse_date(request.query_params.get("end_date", ""))
+
+        if not start_date or not end_date:
+            raise ValidationError({
+                "date": "Both start_date and end_date are required (YYYY-MM-DD)."
+            })
+
+        if start_date > end_date:
+            raise ValidationError({
+                "date": "start_date must be before or equal to end_date."
+            })
+
+        applications = Application.objects.filter(
+            user=request.user,
+            created_at__date__range=(start_date, end_date)
+        )
+
+        platform_counts = (
+            applications.values("platform")
+            .annotate(count=Count("id"))
+            .order_by("platform")
+        )
+
+        status_counts = (
+            applications.values("status")
+            .annotate(count=Count("id"))
+            .order_by("status")
+        )
+
+        return Response({
+            "total_applications": applications.count(),
+            "by_platform": list(platform_counts),
+            "by_status": list(status_counts),
+        })
 
     def create(self, request, *args, **kwargs):
         """Start an application. method=manual opens the posting with the kit (issue #21)."""
