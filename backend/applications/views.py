@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from rest_framework import generics, mixins, serializers, status, viewsets
 from rest_framework.decorators import action, api_view
@@ -11,15 +12,20 @@ from resume_parser.models import Profile
 
 from . import services
 from .kit import build_kit, find_contact_email
-from .models import (
+from .models import(
     APPLY_PLATFORMS,
     Application,
     ApplicationAttempt,
+<<<<<<< HEAD
     ApplicationStatusHistory,
+=======
+    ApplicationResponse,
+>>>>>>> 5390475 (Implement response rate tracking (Issue #37))
     ApplyKit,
     MailboxConfig,
     Notification,
 )
+from .serializers import ApplicationResponseSerializer
 
 
 class KitSerializer(serializers.ModelSerializer):
@@ -47,8 +53,11 @@ class ApplicationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Application
-        fields = ["id", "method", "platform", "status", "posting_url", "title", "company", "to_email",
-                  "result", "kit", "attempts", "requires_confirmation", "created_at", "updated_at"]
+        fields = [
+            "id", "method", "platform", "status", "posting_url", "title",
+            "company", "to_email", "result", "kit", "attempts",
+            "requires_confirmation", "created_at", "updated_at",
+        ]
 
     def get_requires_confirmation(self, obj) -> bool:
         return services.requires_confirmation(obj.user, obj.platform)
@@ -63,7 +72,9 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 
 def _feed_item(request, pk) -> FeedItem:
-    item = FeedItem.objects.select_related("posting").filter(user=request.user, pk=pk).first()
+    item = FeedItem.objects.select_related("posting").filter(
+        user=request.user, pk=pk
+    ).first()
     if item is None:
         raise ValidationError({"feed_item": "Unknown feed item."})
     return item
@@ -88,7 +99,10 @@ class KitViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
 
     def create(self, request, *args, **kwargs):
         item = _feed_item(request, request.data.get("feed_item"))
-        return Response(KitSerializer(_make_kit(request.user, item.posting)).data, status=status.HTTP_201_CREATED)
+        return Response(
+            KitSerializer(_make_kit(request.user, item.posting)).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["patch"])
     def edit(self, request, pk=None):
@@ -108,18 +122,28 @@ class KitViewSet(mixins.CreateModelMixin, mixins.RetrieveModelMixin, viewsets.Ge
         else:
             answers = "\n\n".join(f"{q}\n{a}" for q, a in kit.answers.items())
             text = f"{kit.resume_text}\n---\n\n{kit.cover_letter}\n---\n\n{answers}\n"
+
         resp = HttpResponse(text, content_type="text/plain; charset=utf-8")
-        resp["Content-Disposition"] = f'attachment; filename="apply-kit-{kit.pk}-{which}.txt"'
+        resp["Content-Disposition"] = (
+            f'attachment; filename="apply-kit-{kit.pk}-{which}.txt"'
+        )
         return resp
 
 
-class ApplicationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.CreateModelMixin,
-                         viewsets.GenericViewSet):
+class ApplicationViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
     serializer_class = ApplicationSerializer
 
     def get_queryset(self):
-        qs = (Application.objects.filter(user=self.request.user)
-              .select_related("posting", "kit", "user").prefetch_related("attempts"))
+        qs = (
+            Application.objects.filter(user=self.request.user)
+            .select_related("posting", "kit", "user")
+            .prefetch_related("attempts")
+        )
         if "status" in self.request.query_params:
             qs = qs.filter(status=self.request.query_params["status"])
         return qs
@@ -129,41 +153,69 @@ class ApplicationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixin
         item = _feed_item(request, request.data.get("feed_item"))
         method = request.data.get("method", Application.Method.MANUAL)
         posting, to_email = item.posting, ""
+
         if method == Application.Method.MANUAL:
             if posting.platform not in ("linkedin", "naukri"):
-                raise ValidationError({"method": "Assisted apply is for LinkedIn and Naukri postings."})
+                raise ValidationError({
+                    "method": "Assisted apply is for LinkedIn and Naukri postings."
+                })
             platform = posting.platform
+
         elif method == Application.Method.ATS:
             platform = detect_ats(posting.url)
             if platform is None:
-                raise ValidationError({"method": "This posting is not on Greenhouse or Lever."})
+                raise ValidationError({
+                    "method": "This posting is not on Greenhouse or Lever."
+                })
+
         elif method == Application.Method.EMAIL:
             platform = "email"
             to_email = request.data.get("to_email") or find_contact_email(posting)
             if not to_email:
-                raise ValidationError({"to_email": "This posting lists no contact email; provide one."})
+                raise ValidationError({
+                    "to_email": "This posting lists no contact email; provide one."
+                })
             serializers.EmailField().run_validation(to_email)
+
         else:
             raise ValidationError({"method": "Use manual, ats or email."})
+
         if method == Application.Method.MANUAL:
             try:
                 services.check_limit(request.user, platform)
             except services.Blocked as exc:
                 return _blocked(exc)
+
         kit = _make_kit(request.user, posting)
-        app = Application.objects.create(user=request.user, posting=posting, kit=kit, method=method,
-                                         platform=platform, to_email=to_email)
-        return Response(ApplicationSerializer(app).data, status=status.HTTP_201_CREATED)
+        app = Application.objects.create(
+            user=request.user,
+            posting=posting,
+            kit=kit,
+            method=method,
+            platform=platform,
+            to_email=to_email,
+        )
+        return Response(
+            ApplicationSerializer(app).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["get"])
     def review(self, request, pk=None):
         """Content of the review popup (REQ-10)."""
         app = self.get_object()
         return Response({
-            "application": app.pk, "platform": app.platform, "to_email": app.to_email,
-            "posting_url": app.posting.url, "resume_text": app.kit.resume_text,
-            "cover_letter": app.kit.cover_letter, "answers": app.kit.answers,
-            "requires_confirmation": services.requires_confirmation(request.user, app.platform)})
+            "application": app.pk,
+            "platform": app.platform,
+            "to_email": app.to_email,
+            "posting_url": app.posting.url,
+            "resume_text": app.kit.resume_text,
+            "cover_letter": app.kit.cover_letter,
+            "answers": app.kit.answers,
+            "requires_confirmation": services.requires_confirmation(
+                request.user, app.platform
+            ),
+        })
 
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
@@ -185,6 +237,7 @@ class ApplicationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixin
             return _blocked(exc)
         return Response(ApplicationSerializer(app).data)
 
+<<<<<<< HEAD
     @action(detail=True, methods=["patch"], url_path="change-status")
     def change_status(self, request, pk=None):
         """Allow the user to manually update an application's status (Issue #36)."""
@@ -212,6 +265,82 @@ class ApplicationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixin
             app.save(update_fields=["status", "updated_at"])
 
         return Response(ApplicationSerializer(app).data)
+=======
+    @action(detail=True, methods=["get", "post"])
+    def responses(self, request, pk=None):
+        """REQ-23: View or record employer replies and interview invitations."""
+        app = self.get_object()
+
+        if request.method == "GET":
+            responses = ApplicationResponse.objects.filter(
+                application=app,
+                user=request.user,
+            )
+            serializer = ApplicationResponseSerializer(responses, many=True)
+            return Response(serializer.data)
+
+        serializer = ApplicationResponseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        response = serializer.save(
+            application=app,
+            user=request.user,
+        )
+        return Response(
+            ApplicationResponseSerializer(response).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["get"], url_path="response-rate")
+    def response_rate(self, request):
+        """REQ-23: Calculate overall and per-platform employer response rates."""
+        applications = Application.objects.filter(user=request.user)
+
+        overall = applications.aggregate(
+            total=Count("id", distinct=True),
+            responded=Count(
+                "id",
+                filter=Q(employer_responses__isnull=False),
+                distinct=True,
+            ),
+        )
+
+        by_platform = (
+            applications.values("platform")
+            .annotate(
+                total=Count("id", distinct=True),
+                responded=Count(
+                    "id",
+                    filter=Q(employer_responses__isnull=False),
+                    distinct=True,
+                ),
+            )
+            .order_by("platform")
+        )
+
+        def calculate_rate(responded, total):
+            return round((responded / total) * 100, 2) if total else 0.0
+
+        return Response({
+            "overall": {
+                "total_applications": overall["total"],
+                "responded_applications": overall["responded"],
+                "response_rate": calculate_rate(
+                    overall["responded"], overall["total"]
+                ),
+            },
+            "by_platform": [
+                {
+                    "platform": item["platform"],
+                    "total_applications": item["total"],
+                    "responded_applications": item["responded"],
+                    "response_rate": calculate_rate(
+                        item["responded"], item["total"]
+                    ),
+                }
+                for item in by_platform
+            ],
+        })
+>>>>>>> 5390475 (Implement response rate tracking (Issue #37))
 
 
 class AttemptViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
@@ -255,11 +384,16 @@ def limits_view(request):
             if field in ser.validated_data:
                 setattr(row, field, ser.validated_data[field])
         row.save()
+
     out = []
     for platform in APPLY_PLATFORMS:
         row = services.get_setting(request.user, platform)
-        out.append({"platform": platform, "daily_limit": row.daily_limit, "full_auto": row.full_auto,
-                    "used_today": services.used_today(request.user, platform)})
+        out.append({
+            "platform": platform,
+            "daily_limit": row.daily_limit,
+            "full_auto": row.full_auto,
+            "used_today": services.used_today(request.user, platform),
+        })
     return Response(out)
 
 
@@ -285,10 +419,17 @@ class MailboxView(generics.RetrieveUpdateAPIView):
 
     def update(self, request, *args, **kwargs):
         box = MailboxConfig.objects.filter(user=request.user).first()
-        ser = MailboxSerializer(box, data=request.data, partial=bool(box and kwargs.get("partial")))
+        ser = MailboxSerializer(
+            box,
+            data=request.data,
+            partial=bool(box and kwargs.get("partial")),
+        )
         ser.is_valid(raise_exception=True)
         data = dict(ser.validated_data)
-        data["password_encrypted"] = services.encrypt_password(data.pop("password")) if "password" in data \
+        data["password_encrypted"] = (
+            services.encrypt_password(data.pop("password"))
+            if "password" in data
             else getattr(box, "password_encrypted", "")
+        )
         MailboxConfig.objects.update_or_create(user=request.user, defaults=data)
         return Response({k: v for k, v in ser.data.items()})
