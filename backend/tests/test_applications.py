@@ -6,7 +6,11 @@ from django.core import mail
 from applications.models import (
     Application,
     ApplicationAttempt,
+<<<<<<< HEAD
     ApplicationStatusHistory,
+=======
+    ApplicationResponse,
+>>>>>>> 5390475 (Implement response rate tracking (Issue #37))
     MailboxConfig,
     Notification,
 )
@@ -397,6 +401,7 @@ def test_pause_all_blocks_submission(api):
     assert r.status_code == 409
 
 
+<<<<<<< HEAD
 # ---- #36 Manual application status change -----------------------------------
 
 @pytest.mark.django_db
@@ -442,10 +447,57 @@ def test_manual_status_change_rejects_invalid_status(api):
     response = api.patch(
         f"/api/applications/{app['id']}/change-status/",
         {"status": "invalid"},
+=======
+
+# ---- #37 employer response rate ------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_application_can_record_employer_reply(api):
+    app_id = start(api, make_item(api.user)).data["id"]
+
+    response = api.post(
+        f"/api/applications/{app_id}/responses/",
+        {"response_type": "reply", "note": "Recruiter replied by email."},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.data["response_type"] == "reply"
+    assert response.data["note"] == "Recruiter replied by email."
+    assert ApplicationResponse.objects.filter(
+        application_id=app_id,
+        user=api.user,
+    ).count() == 1
+
+
+@pytest.mark.django_db
+def test_application_can_record_interview_invitation(api):
+    app_id = start(api, make_item(api.user)).data["id"]
+
+    response = api.post(
+        f"/api/applications/{app_id}/responses/",
+        {"response_type": "interview", "note": "Interview scheduled."},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.data["response_type"] == "interview"
+
+
+@pytest.mark.django_db
+def test_application_response_rejects_invalid_type(api):
+    app_id = start(api, make_item(api.user)).data["id"]
+
+    response = api.post(
+        f"/api/applications/{app_id}/responses/",
+        {"response_type": "invalid"},
+>>>>>>> 5390475 (Implement response rate tracking (Issue #37))
         format="json",
     )
 
     assert response.status_code == 400
+
     assert ApplicationStatusHistory.objects.filter(application_id=app["id"]).count() == 0
 
 
@@ -477,3 +529,116 @@ def test_user_cannot_change_another_users_application(api):
     assert ApplicationStatusHistory.objects.filter(
         application_id=app["id"]
     ).count() == 0
+
+
+
+@pytest.mark.django_db
+def test_application_response_history_can_be_retrieved(api):
+    app_id = start(api, make_item(api.user)).data["id"]
+
+    api.post(
+        f"/api/applications/{app_id}/responses/",
+        {"response_type": "reply", "note": "First reply."},
+        format="json",
+    )
+    api.post(
+        f"/api/applications/{app_id}/responses/",
+        {"response_type": "interview", "note": "Interview invitation."},
+        format="json",
+    )
+
+    response = api.get(f"/api/applications/{app_id}/responses/")
+
+    assert response.status_code == 200
+    assert len(response.data) == 2
+
+
+@pytest.mark.django_db
+def test_response_rate_counts_each_application_only_once(api):
+    first_app = start(api, make_item(api.user, ext="response-1")).data["id"]
+    start(api, make_item(api.user, ext="response-2"))
+    start(api, make_item(api.user, ext="response-3"))
+
+    # Two responses for the same application must count as one responded application.
+    api.post(
+        f"/api/applications/{first_app}/responses/",
+        {"response_type": "reply"},
+        format="json",
+    )
+    api.post(
+        f"/api/applications/{first_app}/responses/",
+        {"response_type": "interview"},
+        format="json",
+    )
+
+    response = api.get("/api/applications/response-rate/")
+
+    assert response.status_code == 200
+    assert response.data["overall"]["total_applications"] == 3
+    assert response.data["overall"]["responded_applications"] == 1
+    assert response.data["overall"]["response_rate"] == 33.33
+
+
+@pytest.mark.django_db
+def test_response_rate_is_calculated_per_platform(api):
+    linkedin_item = make_item(
+        api.user,
+        platform="linkedin",
+        url="https://www.linkedin.com/jobs/view/101",
+        ext="linkedin-101",
+    )
+    naukri_item = make_item(api.user, ext="naukri-101")
+
+    linkedin_app = start(api, linkedin_item).data["id"]
+    start(api, naukri_item)
+    start(api, make_item(api.user, ext="naukri-102"))
+
+    api.post(
+        f"/api/applications/{linkedin_app}/responses/",
+        {"response_type": "reply"},
+        format="json",
+    )
+
+    response = api.get("/api/applications/response-rate/")
+
+    assert response.status_code == 200
+
+    rates = {
+        item["platform"]: item
+        for item in response.data["by_platform"]
+    }
+
+    assert rates["linkedin"]["total_applications"] == 1
+    assert rates["linkedin"]["responded_applications"] == 1
+    assert rates["linkedin"]["response_rate"] == 100.0
+
+    assert rates["naukri"]["total_applications"] == 2
+    assert rates["naukri"]["responded_applications"] == 0
+    assert rates["naukri"]["response_rate"] == 0.0
+
+
+@pytest.mark.django_db
+def test_response_rate_does_not_include_other_users_applications(api):
+    from .conftest import make_user
+
+    other_user = make_user("other-response@pes.edu")
+    start(api, make_item(api.user, ext="my-response-1"))
+    start(api, make_item(other_user, ext="other-response-1"))
+
+    response = api.get("/api/applications/response-rate/")
+
+    assert response.status_code == 200
+    assert response.data["overall"]["total_applications"] == 1
+
+
+@pytest.mark.django_db
+def test_response_rate_is_zero_when_user_has_no_applications(api):
+    response = api.get("/api/applications/response-rate/")
+
+    assert response.status_code == 200
+    assert response.data["overall"] == {
+        "total_applications": 0,
+        "responded_applications": 0,
+        "response_rate": 0.0,
+    }
+    assert response.data["by_platform"] == []
