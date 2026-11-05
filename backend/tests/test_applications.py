@@ -6,11 +6,8 @@ from django.core import mail
 from applications.models import (
     Application,
     ApplicationAttempt,
-<<<<<<< HEAD
-    ApplicationStatusHistory,
-=======
     ApplicationResponse,
->>>>>>> 5390475 (Implement response rate tracking (Issue #37))
+    ApplicationStatusHistory,
     MailboxConfig,
     Notification,
 )
@@ -401,7 +398,6 @@ def test_pause_all_blocks_submission(api):
     assert r.status_code == 409
 
 
-<<<<<<< HEAD
 # ---- #36 Manual application status change -----------------------------------
 
 @pytest.mark.django_db
@@ -447,9 +443,43 @@ def test_manual_status_change_rejects_invalid_status(api):
     response = api.patch(
         f"/api/applications/{app['id']}/change-status/",
         {"status": "invalid"},
-=======
+        format="json",
+    )
 
-# ---- #37 employer response rate ------------------------------------------------
+    assert response.status_code == 400
+    assert ApplicationStatusHistory.objects.filter(application_id=app["id"]).count() == 0
+
+
+@pytest.mark.django_db
+def test_user_cannot_change_another_users_application(api):
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    from .conftest import make_user
+
+    other_user = make_user("other@example.com")
+    item = make_item(other_user, ext="foreign-36")
+
+    # Create an application belonging to the other user.
+    other_api = APIClient()
+    other_api.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(other_user).access_token}"
+    )
+    app = start(other_api, item).data
+
+    # Try changing it using the original user's API client.
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "applied"},
+        format="json",
+    )
+
+    assert response.status_code == 404
+    assert ApplicationStatusHistory.objects.filter(
+        application_id=app["id"]
+    ).count() == 0
+
+# ---- Issue #37: Employer response rate ----------------------------------------
 
 
 @pytest.mark.django_db
@@ -492,44 +522,10 @@ def test_application_response_rejects_invalid_type(api):
     response = api.post(
         f"/api/applications/{app_id}/responses/",
         {"response_type": "invalid"},
->>>>>>> 5390475 (Implement response rate tracking (Issue #37))
         format="json",
     )
 
     assert response.status_code == 400
-
-    assert ApplicationStatusHistory.objects.filter(application_id=app["id"]).count() == 0
-
-
-@pytest.mark.django_db
-def test_user_cannot_change_another_users_application(api):
-    from rest_framework.test import APIClient
-    from rest_framework_simplejwt.tokens import RefreshToken
-
-    from .conftest import make_user
-
-    other_user = make_user("other@example.com")
-    item = make_item(other_user, ext="foreign-36")
-
-    # Create an application belonging to the other user.
-    other_api = APIClient()
-    other_api.credentials(
-        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(other_user).access_token}"
-    )
-    app = start(other_api, item).data
-
-    # Try changing it using the original user's API client.
-    response = api.patch(
-        f"/api/applications/{app['id']}/change-status/",
-        {"status": "applied"},
-        format="json",
-    )
-
-    assert response.status_code == 404
-    assert ApplicationStatusHistory.objects.filter(
-        application_id=app["id"]
-    ).count() == 0
-
 
 
 @pytest.mark.django_db
@@ -559,7 +555,6 @@ def test_response_rate_counts_each_application_only_once(api):
     start(api, make_item(api.user, ext="response-2"))
     start(api, make_item(api.user, ext="response-3"))
 
-    # Two responses for the same application must count as one responded application.
     api.post(
         f"/api/applications/{first_app}/responses/",
         {"response_type": "reply"},
