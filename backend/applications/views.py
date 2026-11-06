@@ -24,6 +24,7 @@ from .models import (
     ApplyKit,
     MailboxConfig,
     Notification,
+    PlatformCredential,
 )
 
 
