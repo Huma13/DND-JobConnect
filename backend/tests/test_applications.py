@@ -6,6 +6,7 @@ from django.core import mail
 from applications.models import (
     Application,
     ApplicationAttempt,
+    ApplicationResponse,
     ApplicationStatusHistory,
     MailboxConfig,
     Notification,
@@ -477,3 +478,100 @@ def test_user_cannot_change_another_users_application(api):
     assert ApplicationStatusHistory.objects.filter(
         application_id=app["id"]
     ).count() == 0
+
+
+# ---- #39 keyword response analytics -----------------------------------------------
+
+@pytest.mark.django_db
+def test_keyword_analytics_counts_applications_and_responses(api):
+    item1 = make_item(api.user, ext="keyword-1")
+    item1.posting.skills = ["Python", "SQL"]
+    item1.posting.save()
+
+    item2 = make_item(api.user, ext="keyword-2")
+    item2.posting.skills = ["Python", "Docker"]
+    item2.posting.save()
+
+    app1_id = start(api, item1).data["id"]
+    app2_id = start(api, item2).data["id"]
+
+    api.post(f"/api/applications/{app1_id}/mark-applied/")
+    api.post(f"/api/applications/{app2_id}/mark-applied/")
+
+    app1 = Application.objects.get(pk=app1_id)
+
+    ApplicationResponse.objects.create(
+        application=app1,
+        user=api.user,
+        response_type=ApplicationResponse.Type.REPLY,
+        note="Employer replied",
+    )
+
+    response = api.get("/api/applications/keyword-analytics/")
+
+    assert response.status_code == 200
+
+    results = {item["keyword"]: item for item in response.data["keywords"]}
+
+    assert results["Python"]["application_count"] == 2
+    assert results["Python"]["response_count"] == 1
+    assert results["Python"]["response_rate"] == 50.0
+
+    assert results["SQL"]["application_count"] == 1
+    assert results["SQL"]["response_count"] == 1
+
+    assert results["Docker"]["application_count"] == 1
+    assert results["Docker"]["response_count"] == 0
+
+
+@pytest.mark.django_db
+def test_keyword_analytics_does_not_double_count_multiple_responses(api):
+    item = make_item(api.user, ext="keyword-multiple")
+    item.posting.skills = ["Python"]
+    item.posting.save()
+
+    app_id = start(api, item).data["id"]
+    api.post(f"/api/applications/{app_id}/mark-applied/")
+
+    application = Application.objects.get(pk=app_id)
+
+    for response_type in (
+        ApplicationResponse.Type.REPLY,
+        ApplicationResponse.Type.INTERVIEW,
+    ):
+        ApplicationResponse.objects.create(
+            application=application,
+            user=api.user,
+            response_type=response_type,
+        )
+
+    response = api.get("/api/applications/keyword-analytics/")
+    python_result = next(
+        item for item in response.data["keywords"]
+        if item["keyword"] == "Python"
+    )
+
+    assert python_result["application_count"] == 1
+    assert python_result["response_count"] == 1
+    assert python_result["response_rate"] == 100.0
+
+
+@pytest.mark.django_db
+def test_keyword_analytics_does_not_include_other_users_applications(api):
+    from .conftest import make_user
+
+    other_user = make_user("other-keyword@pes.edu", skills=["Python"])
+
+    item = make_item(other_user, ext="other-keyword")
+    item.posting.skills = ["Python"]
+    item.posting.save()
+
+    response = api.get("/api/applications/keyword-analytics/")
+
+    python_result = next(
+        item for item in response.data["keywords"]
+        if item["keyword"] == "Python"
+    )
+
+    assert python_result["application_count"] == 0
+    assert python_result["response_count"] == 0
