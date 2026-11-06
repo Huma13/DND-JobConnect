@@ -300,3 +300,56 @@ class MailboxView(generics.RetrieveUpdateAPIView):
             else getattr(box, "password_encrypted", "")
         MailboxConfig.objects.update_or_create(user=request.user, defaults=data)
         return Response({k: v for k, v in ser.data.items()})
+
+class PlatformCredentialWriteSerializer(serializers.Serializer):
+    platform = serializers.ChoiceField(choices=Platform.choices)
+    credentials = serializers.JSONField(write_only=True)
+
+    def validate_credentials(self, value):
+        if not isinstance(value, dict) or not value:
+            raise serializers.ValidationError(
+                "Credentials must be a non-empty object."
+            )
+
+        if not all(
+            isinstance(key, str)
+            and key.strip()
+            and isinstance(secret, str)
+            and secret.strip()
+            for key, secret in value.items()
+        ):
+            raise serializers.ValidationError(
+                "Credential names and values must be non-empty strings."
+            )
+
+        return value
+
+
+class PlatformCredentialView(generics.GenericAPIView):
+    serializer_class = PlatformCredentialWriteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        platform = serializer.validated_data["platform"]
+        credentials = serializer.validated_data["credentials"]
+
+        encrypted = encrypt_credential(
+            json.dumps(credentials, separators=(",", ":"))
+        )
+
+        credential, created = PlatformCredential.objects.update_or_create(
+            user=request.user,
+            platform=platform,
+            defaults={"credentials_encrypted": encrypted},
+        )
+
+        return Response(
+            {
+                "platform": credential.platform,
+                "updated_at": credential.updated_at,
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
