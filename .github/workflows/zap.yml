@@ -1,0 +1,72 @@
+
+name: ZAP Security Scan
+
+on:
+  push:
+    branches:
+      - feature/44-security-system-testing
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    name: OWASP ZAP Baseline Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure test environment
+        run: |
+          cp backend/.env.example backend/.env
+          sed -i 's/^DJANGO_SECRET_KEY=.*/DJANGO_SECRET_KEY=ci-only-zap-secret-key/' backend/.env
+          sed -i 's/^DJANGO_ALLOWED_HOSTS=.*/DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1/' backend/.env
+          sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=jobconnect/' backend/.env
+          sed -i 's/^POSTGRES_HOST=.*/POSTGRES_HOST=db/' backend/.env
+          sed -i 's#^REDIS_URL=.*#REDIS_URL=redis://redis:6379/0#' backend/.env
+
+      - name: Start application with Docker Compose
+        run: docker compose up -d --build web
+
+      - name: Wait for application health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/health/; then
+              echo "Application is healthy."
+              exit 0
+            fi
+            echo "Waiting for application..."
+            sleep 5
+          done
+          docker compose logs
+          exit 1
+
+      - name: Run OWASP ZAP baseline scan
+        run: |
+          docker run --rm --network host \
+            -v "$GITHUB_WORKSPACE:/zap/wrk/:rw" \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://127.0.0.1:8000 \
+            -m 2 \
+            -I \
+            -r /zap/wrk/zap-report.html \
+            -J /zap/wrk/zap-report.json
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-security-reports
+          path: |
+            zap-report.html
+            zap-report.json
+          if-no-files-found: warn
+
+      - name: Stop test environment
+        if: always()
+        run: docker compose down -v
