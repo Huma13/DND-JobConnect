@@ -26,8 +26,8 @@ class Migration(migrations.Migration):
                 ),
                 ("platform", models.CharField(max_length=20, choices=[
                     ("linkedin", "LinkedIn"),
-                    ("naukri", "Naukri"),
-                    ("x", "X"),
+                    ("x", "X (Twitter)"),
+                    ("naukri", "Naukri.com"),
                 ])),
                 ("credentials_encrypted", models.TextField()),
                 ("updated_at", models.DateTimeField(auto_now=True)),
