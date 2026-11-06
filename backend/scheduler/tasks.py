@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
+from accounts.gates import DISCLAIMER_REQUIRED, disclaimer_accepted
+
 from .models import ScheduledRun
 
 log = logging.getLogger(__name__)
@@ -22,6 +24,12 @@ def execute_run(run: ScheduledRun, platforms=None) -> ScheduledRun:
     if user.automation_paused:
         run.status = ScheduledRun.Status.SKIPPED
         run.errors = [{"platform": "*", "error": "Automation is paused."}]
+        run.finished_at = timezone.now()
+        run.save()
+        return run
+    if not disclaimer_accepted(user):
+        run.status = ScheduledRun.Status.SKIPPED
+        run.errors = [{"platform": "*", "error": DISCLAIMER_REQUIRED}]
         run.finished_at = timezone.now()
         run.save()
         return run
