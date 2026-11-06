@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from .disclaimer import DISCLAIMER_TEXT, DISCLAIMER_VERSION, has_accepted
 from .gates import disclaimer_required
 from .serializers import RegisterSerializer
-from .models import PlatformCredential
+
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
