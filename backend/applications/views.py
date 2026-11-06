@@ -5,6 +5,7 @@ from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from accounts.gates import disclaimer_accepted, disclaimer_required_response
 from integrations.ats import detect_ats
 from matching.models import FeedItem
 from resume_parser.models import Profile
@@ -167,6 +168,8 @@ class ApplicationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixin
 
     @action(detail=True, methods=["post"])
     def submit(self, request, pk=None):
+        if not disclaimer_accepted(request.user):
+            return disclaimer_required_response()
         app = self.get_object()
         confirmed = request.data.get("confirmed") in (True, "true", "1", 1)
         try:
