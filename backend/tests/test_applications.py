@@ -477,3 +477,72 @@ def test_user_cannot_change_another_users_application(api):
     assert ApplicationStatusHistory.objects.filter(
         application_id=app["id"]
     ).count() == 0
+
+
+# ---- #38 Export application history as CSV -------------------------------
+
+@pytest.mark.django_db
+def test_application_history_can_be_exported_as_csv(api):
+    item = make_item(api.user)
+    start(api, item)
+
+    response = api.get("/api/applications/export/")
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/csv"
+    assert "attachment; filename=\"application_history.csv\"" in response[
+        "Content-Disposition"
+    ]
+
+    content = response.content.decode("utf-8")
+    assert "Application ID" in content
+    assert "Job Title" in content
+    assert "Company" in content
+
+
+@pytest.mark.django_db
+def test_application_csv_contains_application_details(api):
+    item = make_item(api.user)
+    app = start(api, item).data
+
+    response = api.get("/api/applications/export/")
+    content = response.content.decode("utf-8")
+
+    assert str(app["id"]) in content
+    assert item.posting.title in content
+    assert item.posting.company in content
+
+
+
+
+
+@pytest.mark.django_db
+def test_application_csv_only_contains_current_users_applications(api):
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    from .conftest import make_user
+
+    # Create an application for the logged-in user.
+    item = make_item(api.user)
+    start(api, item)
+
+    # Create another user's application.
+    other_user = make_user("other-csv@example.com")
+    other_item = make_item(other_user, ext="foreign-csv")
+    other_item.posting.title = "Foreign User Exclusive Job"
+    other_item.posting.save(update_fields=["title"])
+
+    other_api = APIClient()
+    other_api.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(other_user).access_token}"
+    )
+    start(other_api, other_item)
+
+    # Export using the original user's client.
+    response = api.get("/api/applications/export/")
+    content = response.content.decode("utf-8")
+
+    assert response.status_code == 200
+    assert item.posting.title in content
+    assert other_item.posting.title not in content
