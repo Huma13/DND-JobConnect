@@ -3,6 +3,7 @@ from rest_framework import generics, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from accounts.gates import disclaimer_accepted, disclaimer_required_response
 from scheduler.models import ScheduledRun
 from scheduler.tasks import search_task
 
@@ -48,6 +49,8 @@ class FeedViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
         """Start a manual search now. Runs in the worker; poll the run for results."""
         if request.user.automation_paused:
             return Response({"detail": "Automation is paused."}, status=status.HTTP_409_CONFLICT)
+        if not disclaimer_accepted(request.user):
+            return disclaimer_required_response()
         active = ScheduledRun.objects.filter(user=request.user, status=ScheduledRun.Status.RUNNING).first()
         if active:
             return Response({"run_id": active.pk, "detail": "A search is already running."},

@@ -3,6 +3,7 @@ from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from accounts.gates import disclaimer_accepted, disclaimer_required_response
 from applications.services import Blocked
 from matching.models import FeedItem
 
@@ -100,6 +101,8 @@ class MessageViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Cr
     @action(detail=True, methods=["post"])
     def send(self, request, pk=None):
         """X: sent through the API."""
+        if not disclaimer_accepted(request.user):
+            return disclaimer_required_response()
         try:
             msg = services.send_via_api(self.get_object())
         except Blocked as exc:
