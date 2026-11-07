@@ -12,4 +12,5 @@ router.register("", views.ApplicationViewSet, basename="application")
 urlpatterns = [
     path("limits/", views.limits_view),
     path("mailbox/", views.MailboxView.as_view()),
+    path("platform-credentials/", views.PlatformCredentialView.as_view()),
 ] + router.urls
