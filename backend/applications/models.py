@@ -129,7 +129,6 @@ class ApplicationStatusHistory(models.Model):
     def __str__(self):
         return f"Application {self.application_id}: {self.old_status} → {self.new_status}"
 
-
 class ApplicationResponse(models.Model):
     """Tracks employer replies and interview invitations."""
 
@@ -156,3 +155,29 @@ class ApplicationResponse(models.Model):
 
     def __str__(self):
         return f"{self.application_id} - {self.response_type}"
+
+class PlatformCredential(models.Model):
+    """Encrypted, write-only credentials for a user's platform account."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="platform_credentials",
+    )
+    platform = models.CharField(
+        max_length=20,
+        choices=Platform.choices,
+    )
+    credentials_encrypted = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "platform"],
+                name="uniq_user_platform_credential",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}: {self.platform} credentials"
