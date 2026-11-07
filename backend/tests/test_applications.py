@@ -575,3 +575,129 @@ def test_keyword_analytics_does_not_include_other_users_applications(api):
 
     assert python_result["application_count"] == 0
     assert python_result["response_count"] == 0
+
+
+# ---- #35 application statistics by platform and status ----------------------------
+
+@pytest.mark.django_db
+def test_application_statistics_counts_by_platform_and_status(api):
+    naukri_item = make_item(api.user, platform="naukri", ext="stats-naukri")
+    linkedin_item = make_item(
+        api.user,
+        platform="linkedin",
+        url="https://www.linkedin.com/jobs/view/12345",
+        ext="stats-linkedin",
+    )
+
+    naukri_app = start(api, naukri_item).data
+    linkedin_app = start(api, linkedin_item).data
+
+    # Change one application from draft to applied.
+    api.post(f"/api/applications/{linkedin_app['id']}/mark-applied/")
+
+    response = api.get(
+        "/api/applications/statistics/",
+        {"start_date": "2026-01-01", "end_date": "2026-12-31"},
+    )
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 2
+
+    assert {
+        item["platform"]: item["count"]
+        for item in response.data["by_platform"]
+    } == {
+        "naukri": 1,
+        "linkedin": 1,
+    }
+
+    assert {
+        item["status"]: item["count"]
+        for item in response.data["by_status"]
+    } == {
+        "draft": 1,
+        "applied": 1,
+    }
+
+
+@pytest.mark.django_db
+def test_application_statistics_filters_by_date_range(api):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    item1 = make_item(api.user, ext="stats-date-inside")
+    item2 = make_item(api.user, ext="stats-date-outside")
+
+    app1 = start(api, item1).data
+    app2 = start(api, item2).data
+
+    today = timezone.now()
+    Application.objects.filter(pk=app1["id"]).update(
+        created_at=today - timedelta(days=2)
+    )
+    Application.objects.filter(pk=app2["id"]).update(
+        created_at=today - timedelta(days=10)
+    )
+
+    selected_date = (today - timedelta(days=3)).date()
+
+    response = api.get(
+        "/api/applications/statistics/",
+        {
+            "start_date": selected_date.isoformat(),
+            "end_date": today.date().isoformat(),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 1
+
+
+@pytest.mark.django_db
+def test_application_statistics_excludes_other_users(api):
+    from .conftest import make_user
+
+    other_user = make_user("other-stats@example.com")
+    other_item = make_item(other_user, ext="stats-other-user")
+
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    other_api = APIClient()
+    other_api.credentials(
+        HTTP_AUTHORIZATION=(
+            f"Bearer {RefreshToken.for_user(other_user).access_token}"
+        )
+    )
+    start(other_api, other_item)
+
+    response = api.get(
+        "/api/applications/statistics/",
+        {"start_date": "2026-01-01", "end_date": "2026-12-31"},
+    )
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 0
+    assert response.data["by_platform"] == []
+    assert response.data["by_status"] == []
+
+
+@pytest.mark.django_db
+def test_application_statistics_requires_both_dates(api):
+    response = api.get(
+        "/api/applications/statistics/",
+        {"start_date": "2026-01-01"},
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_application_statistics_rejects_invalid_date_range(api):
+    response = api.get(
+        "/api/applications/statistics/",
+        {"start_date": "2026-12-31", "end_date": "2026-01-01"},
+    )
+
+    assert response.status_code == 400
