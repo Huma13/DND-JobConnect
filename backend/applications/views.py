@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from accounts.gates import disclaimer_accepted, disclaimer_required_response
 from core.choices import Platform
 from integrations.ats import detect_ats
-from matching.models import FeedItem, JobPosting
+from matching.models import FeedItem
 from resume_parser.models import Profile
 
 from . import services
