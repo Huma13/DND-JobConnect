@@ -1,7 +1,8 @@
 import json
 
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Count, Prefetch
+from django.utils.dateparse import parse_date
 from django.http import Http404, HttpResponse
 from rest_framework import generics, mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view
@@ -161,6 +162,7 @@ class ApplicationViewSet(
     @action(detail=False, methods=["get"], url_path="keyword-analytics")
     def keyword_analytics(self, request):
         """Issue #39: Track application responses for resume keywords."""
+    
 
         profile = Profile.objects.filter(user=request.user).first()
 
@@ -242,6 +244,45 @@ class ApplicationViewSet(
         )
 
         return Response({"keywords": keywords})
+    @action(detail=False, methods=["get"], url_path="statistics")
+    def statistics(self, request):
+        """Issue #35: application counts by platform and status for a date range."""
+
+        start_date = parse_date(request.query_params.get("start_date", ""))
+        end_date = parse_date(request.query_params.get("end_date", ""))
+
+        if not start_date or not end_date:
+            raise ValidationError({
+                "date": "Both start_date and end_date are required (YYYY-MM-DD)."
+            })
+
+        if start_date > end_date:
+            raise ValidationError({
+                "date": "start_date must be before or equal to end_date."
+            })
+
+        applications = Application.objects.filter(
+            user=request.user,
+            created_at__date__range=(start_date, end_date),
+        )
+
+        platform_counts = (
+            applications.values("platform")
+            .annotate(count=Count("id"))
+            .order_by("platform")
+        )
+
+        status_counts = (
+            applications.values("status")
+            .annotate(count=Count("id"))
+            .order_by("status")
+        )
+
+        return Response({
+            "total_applications": applications.count(),
+            "by_platform": list(platform_counts),
+            "by_status": list(status_counts),
+        })
 
     def create(self, request, *args, **kwargs):
         """Start an application. method=manual opens the posting with the kit (issue #21)."""
