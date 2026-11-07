@@ -129,6 +129,33 @@ class ApplicationStatusHistory(models.Model):
     def __str__(self):
         return f"Application {self.application_id}: {self.old_status} → {self.new_status}"
 
+class ApplicationResponse(models.Model):
+    """Tracks employer replies and interview invitations."""
+
+    class Type(models.TextChoices):
+        REPLY = "reply", "Employer Reply"
+        INTERVIEW = "interview", "Interview Invitation"
+
+    application = models.ForeignKey(
+        Application,
+        on_delete=models.CASCADE,
+        related_name="employer_responses",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="application_responses",
+    )
+    response_type = models.CharField(max_length=20, choices=Type.choices)
+    note = models.TextField(blank=True)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-received_at", "-id"]
+
+    def __str__(self):
+        return f"{self.application_id} - {self.response_type}"
+
 class PlatformCredential(models.Model):
     """Encrypted, write-only credentials for a user's platform account."""
 

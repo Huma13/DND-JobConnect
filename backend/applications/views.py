@@ -1,7 +1,7 @@
-
 import json
 
 from django.db import transaction
+from django.db.models import Prefetch
 from django.http import Http404, HttpResponse
 from rest_framework import generics, mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view
@@ -21,6 +21,7 @@ from .models import (
     APPLY_PLATFORMS,
     Application,
     ApplicationAttempt,
+    ApplicationResponse,
     ApplicationStatusHistory,
     ApplyKit,
     MailboxConfig,
@@ -156,6 +157,91 @@ class ApplicationViewSet(
         if "status" in self.request.query_params:
             qs = qs.filter(status=self.request.query_params["status"])
         return qs
+
+    @action(detail=False, methods=["get"], url_path="keyword-analytics")
+    def keyword_analytics(self, request):
+        """Issue #39: Track application responses for resume keywords."""
+
+        profile = Profile.objects.filter(user=request.user).first()
+
+        if not profile or not isinstance(profile.skills, list):
+            return Response({"keywords": []})
+
+        # Normalize resume keywords.
+        skills = {}
+        for skill in profile.skills:
+            if isinstance(skill, str) and skill.strip():
+                normalized = skill.strip().casefold()
+                skills.setdefault(normalized, skill.strip())
+
+        if not skills:
+            return Response({"keywords": []})
+
+        # Fetch only this user's applied/submitted applications.
+        applications = (
+            Application.objects.filter(
+                user=request.user,
+                status__in=[
+                    Application.Status.APPLIED,
+                    Application.Status.SUBMITTED,
+                ],
+            )
+            .select_related("posting")
+            .prefetch_related(
+                Prefetch(
+                    "employer_responses",
+                    queryset=ApplicationResponse.objects.filter(user=request.user),
+                    to_attr="user_responses",
+                )
+            )
+        )
+
+        results = {
+            normalized: {
+                "keyword": original,
+                "application_count": 0,
+                "response_count": 0,
+            }
+            for normalized, original in skills.items()
+        }
+
+        for application in applications:
+            job_skills = {
+                skill.strip().casefold()
+                for skill in application.posting.skills
+                if isinstance(skill, str) and skill.strip()
+            }
+
+            has_response = bool(application.user_responses)
+
+            for normalized, result in results.items():
+                if normalized in job_skills:
+                    result["application_count"] += 1
+
+                    if has_response:
+                        result["response_count"] += 1
+
+        keywords = []
+
+        for result in results.values():
+            total = result["application_count"]
+            responses = result["response_count"]
+
+            result["response_rate"] = (
+                round((responses / total) * 100, 2) if total else 0
+            )
+
+            keywords.append(result)
+
+        keywords.sort(
+            key=lambda item: (
+                item["response_count"],
+                item["response_rate"],
+            ),
+            reverse=True,
+        )
+
+        return Response({"keywords": keywords})
 
     def create(self, request, *args, **kwargs):
         """Start an application. method=manual opens the posting with the kit (issue #21)."""
