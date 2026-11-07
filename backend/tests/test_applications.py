@@ -589,7 +589,7 @@ def test_application_statistics_counts_by_platform_and_status(api):
         ext="stats-linkedin",
     )
 
-    naukri_app = start(api, naukri_item).data
+    start(api, naukri_item)
     linkedin_app = start(api, linkedin_item).data
 
     # Change one application from draft to applied.
