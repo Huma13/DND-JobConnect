@@ -2,8 +2,8 @@ import json
 
 from django.db import transaction
 from django.db.models import Count, Prefetch
-from django.utils.dateparse import parse_date
 from django.http import Http404, HttpResponse
+from django.utils.dateparse import parse_date
 from rest_framework import generics, mixins, permissions, serializers, status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.exceptions import ValidationError
@@ -162,7 +162,6 @@ class ApplicationViewSet(
     @action(detail=False, methods=["get"], url_path="keyword-analytics")
     def keyword_analytics(self, request):
         """Issue #39: Track application responses for resume keywords."""
-    
 
         profile = Profile.objects.filter(user=request.user).first()
 
