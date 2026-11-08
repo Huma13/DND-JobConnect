@@ -398,9 +398,6 @@ def test_anonymous_users_cannot_upload():
     )
     assert response.status_code in (401, 403)
 
-    PROFILE_URL = "/api/resume/profile/"
-
-
 def test_get_profile(client, seeker):
     profile = Profile.objects.create(
         user=seeker,

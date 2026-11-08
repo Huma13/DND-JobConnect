@@ -1,8 +1,8 @@
 from django.urls import path
 
 from .profile_tips_view import profile_tips
-from .upload import upload_resume
 from .profile_views import ProfileView
+from .upload import upload_resume
 
 urlpatterns = [
     path("tips/", profile_tips, name="profile-tips"),
