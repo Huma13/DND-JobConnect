@@ -2,9 +2,9 @@ from django.db.models import Prefetch
 from rest_framework import generics, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from resume_parser.models import Profile
 
 from accounts.gates import disclaimer_accepted, disclaimer_required_response
+from resume_parser.models import Profile
 from scheduler.models import ScheduledRun
 from scheduler.tasks import search_task
 

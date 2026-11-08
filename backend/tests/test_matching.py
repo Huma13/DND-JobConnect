@@ -9,10 +9,10 @@ from matching.dedup import dedup_key, normalize_company, normalize_title
 from matching.models import FeedItem, JobPosting, SearchPreference
 from matching.scoring import ProfileView, score
 from matching.services import rescore_feed, run_search
+from resume_parser.models import Profile
 
 from .conftest import make_user
 from .fakes import FakeSource, factory, posting
-from resume_parser.models import Profile
 
 P = ProfileView(skills=("Python", "PyTorch", "SQL", "C++"), roles=("ML Engineer",),
                 locations=("Bengaluru",), years=2)
