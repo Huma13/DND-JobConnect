@@ -6,6 +6,7 @@ from rest_framework.test import APIClient
 from accounts.disclaimer import DISCLAIMER_VERSION
 from accounts.gates import DISCLAIMER_REQUIRED
 from accounts.models import User
+from resume_parser.models import Profile
 from scheduler.models import ScheduledRun
 from scheduler.tasks import execute_run
 
@@ -56,6 +57,10 @@ def test_manual_search_is_no_longer_blocked_after_accepting(client, seeker, monk
     seeker.disclaimer_accepted_at = seeker.date_joined
     seeker.disclaimer_version = DISCLAIMER_VERSION
     seeker.save()
+    Profile.objects.create(
+    user=seeker,
+    preferred_roles=["Software Developer"],
+    )
     monkeypatch.setattr("matching.views.search_task.delay", lambda *args, **kwargs: None)
     response = client.post("/api/jobs/feed/search/")
     assert response.status_code == 202

@@ -14,6 +14,7 @@ from resume_parser import extract, upload
 from resume_parser.models import Profile
 
 URL = "/api/resume/upload/"
+PROFILE_URL = "/api/resume/profile/"
 TODAY = date(2024, 7, 1)
 
 SAMPLE_LINES = [
@@ -396,3 +397,58 @@ def test_anonymous_users_cannot_upload():
         URL, {"file": _file("cv.pdf", make_pdf(SAMPLE_LINES))}, format="multipart"
     )
     assert response.status_code in (401, 403)
+
+def test_get_profile(client, seeker):
+    profile = Profile.objects.create(
+        user=seeker,
+        full_name="Test User",
+        skills=["Python", "Django"],
+        years_of_experience=1,
+        highest_qualification="B.Tech",
+        preferred_roles=["Software Developer"],
+        preferred_locations=["Bangalore"],
+    )
+
+    response = client.get(PROFILE_URL)
+
+    assert response.status_code == 200
+    assert response.data["full_name"] == profile.full_name
+    assert response.data["skills"] == ["Python", "Django"]
+    assert response.data["preferred_roles"] == ["Software Developer"]
+
+
+def test_update_profile(client, seeker):
+    Profile.objects.create(
+        user=seeker,
+        full_name="Test User",
+        skills=["Python"],
+        years_of_experience=1,
+        highest_qualification="B.Tech",
+        preferred_roles=["Developer"],
+        preferred_locations=["Bangalore"],
+    )
+
+    updated_data = {
+        "full_name": "Updated User",
+        "skills": ["Python", " Django ", "Python"],
+        "years_of_experience": 2,
+        "highest_qualification": "M.Tech",
+        "preferred_roles": ["Backend Developer"],
+        "preferred_locations": ["Bangalore", "Mysore"],
+    }
+
+    response = client.put(PROFILE_URL, updated_data, format="json")
+
+    assert response.status_code == 200
+    assert response.data["full_name"] == "Updated User"
+    assert response.data["skills"] == ["Python", "Django"]
+    assert response.data["preferred_roles"] == ["Backend Developer"]
+    assert response.data["preferred_locations"] == ["Bangalore", "Mysore"]
+
+
+def test_profile_requires_authentication():
+    from rest_framework.test import APIClient
+
+    response = APIClient().get(PROFILE_URL)
+
+    assert response.status_code == 401
