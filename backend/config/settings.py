@@ -126,6 +126,9 @@ X_API_KEY = env("X_API_KEY", "")
 X_API_SECRET = env("X_API_SECRET", "")
 X_ACCESS_TOKEN = env("X_ACCESS_TOKEN", "")
 X_ACCESS_SECRET = env("X_ACCESS_SECRET", "")
+PLATFORM_CREDENTIAL_ENCRYPTION_KEY = env(
+    "PLATFORM_CREDENTIAL_ENCRYPTION_KEY", ""
+)
 APPLICATION_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 SOURCE_TIMEOUT_SECONDS = 20          # per source; whole search stays under the 30 s target (SRS 6.1)
