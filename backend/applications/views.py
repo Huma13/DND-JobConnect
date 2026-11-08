@@ -1,3 +1,4 @@
+import csv
 import json
 
 from django.db import transaction
@@ -409,6 +410,44 @@ class ApplicationViewSet(
             app.save(update_fields=["status", "updated_at"])
 
         return Response(ApplicationSerializer(app).data)
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export_csv(self, request):
+        """Export the user's application history as CSV (Issue #38)."""
+        applications = self.get_queryset().order_by("-created_at", "-id")
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = (
+            'attachment; filename="application_history.csv"'
+        )
+
+        writer = csv.writer(response)
+        writer.writerow([
+            "Application ID",
+            "Job Title",
+            "Company",
+            "Platform",
+            "Method",
+            "Status",
+            "Recipient Email",
+            "Applied Date",
+            "Last Updated",
+        ])
+
+        for app in applications:
+            writer.writerow([
+                app.id,
+                app.posting.title,
+                app.posting.company,
+                app.platform,
+                app.method,
+                app.status,
+                app.to_email,
+                app.created_at.isoformat(),
+                app.updated_at.isoformat(),
+            ])
+
+        return response
 
 
 class AttemptViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
