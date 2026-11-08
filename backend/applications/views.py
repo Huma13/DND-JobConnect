@@ -1,7 +1,7 @@
 import csv
 import json
 
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import Count, Prefetch
 from django.http import Http404, HttpResponse
 from django.utils.dateparse import parse_date
@@ -282,6 +282,73 @@ class ApplicationViewSet(
             "total_applications": applications.count(),
             "by_platform": list(platform_counts),
             "by_status": list(status_counts),
+        })
+
+    @action(detail=False, methods=["get"], url_path="response-analytics")
+    def response_analytics(self, request):
+        """Issue #37: overall and platform-wise employer response rates."""
+
+        eligible_statuses = [
+            Application.Status.APPLIED,
+            Application.Status.SUBMITTED,
+        ]
+
+        applications = Application.objects.filter(
+            user=request.user,
+            status__in=eligible_statuses,
+        )
+
+        total_applications = applications.count()
+
+        responded_applications = applications.filter(
+            employer_responses__user=request.user,
+        ).distinct()
+
+        response_count = responded_applications.count()
+
+        overall_rate = (
+            round((response_count / total_applications) * 100, 2)
+            if total_applications
+            else 0
+        )
+
+        platform_stats = (
+            applications.values("platform")
+            .annotate(
+                application_count=Count("id", distinct=True),
+                response_count=Count(
+                    "employer_responses__application_id",
+                    filter=models.Q(
+                        employer_responses__user=request.user
+                    ),
+                    distinct=True,
+                ),
+            )
+            .order_by("platform")
+        )
+
+        by_platform = []
+
+        for item in platform_stats:
+            total = item["application_count"]
+            responses = item["response_count"]
+
+            by_platform.append({
+                "platform": item["platform"],
+                "application_count": total,
+                "response_count": responses,
+                "response_rate": (
+                    round((responses / total) * 100, 2)
+                    if total
+                    else 0
+                ),
+            })
+
+        return Response({
+            "total_applications": total_applications,
+            "response_count": response_count,
+            "response_rate": overall_rate,
+            "by_platform": by_platform,
         })
 
     def create(self, request, *args, **kwargs):
@@ -598,3 +665,4 @@ class PlatformCredentialView(generics.GenericAPIView):
             },
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+

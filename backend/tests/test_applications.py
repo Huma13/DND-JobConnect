@@ -769,3 +769,91 @@ def test_application_statistics_rejects_invalid_date_range(api):
     )
 
     assert response.status_code == 400
+
+# ---- #37 response-rate analytics -----------------------------------------------
+
+@pytest.mark.django_db
+def test_response_analytics_calculates_overall_and_platform_rates(api):
+    naukri_item = make_item(api.user, platform="naukri", ext="response-naukri")
+    linkedin_item = make_item(
+        api.user,
+        platform="linkedin",
+        url="https://www.linkedin.com/jobs/view/12345",
+        ext="response-linkedin",
+    )
+
+    naukri_id = start(api, naukri_item).data["id"]
+    linkedin_id = start(api, linkedin_item).data["id"]
+
+    api.post(f"/api/applications/{naukri_id}/mark-applied/")
+    api.post(f"/api/applications/{linkedin_id}/mark-applied/")
+
+    application = Application.objects.get(pk=naukri_id)
+
+    ApplicationResponse.objects.create(
+        application=application,
+        user=api.user,
+        response_type=ApplicationResponse.Type.REPLY,
+    )
+
+    response = api.get("/api/applications/response-analytics/")
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 2
+    assert response.data["response_count"] == 1
+    assert response.data["response_rate"] == 50.0
+
+    platforms = {
+        item["platform"]: item
+        for item in response.data["by_platform"]
+    }
+
+    assert platforms["naukri"]["response_rate"] == 100.0
+    assert platforms["linkedin"]["response_rate"] == 0.0
+
+
+@pytest.mark.django_db
+def test_response_analytics_does_not_double_count_responses(api):
+    item = make_item(api.user, ext="response-multiple")
+    app_id = start(api, item).data["id"]
+
+    api.post(f"/api/applications/{app_id}/mark-applied/")
+
+    application = Application.objects.get(pk=app_id)
+
+    for response_type in (
+        ApplicationResponse.Type.REPLY,
+        ApplicationResponse.Type.INTERVIEW,
+    ):
+        ApplicationResponse.objects.create(
+            application=application,
+            user=api.user,
+            response_type=response_type,
+        )
+
+    response = api.get("/api/applications/response-analytics/")
+
+    assert response.data["total_applications"] == 1
+    assert response.data["response_count"] == 1
+    assert response.data["response_rate"] == 100.0
+
+
+@pytest.mark.django_db
+def test_response_analytics_excludes_ineligible_applications(api):
+    draft_item = make_item(api.user, ext="response-draft")
+    failed_item = make_item(api.user, ext="response-failed")
+
+    start(api, draft_item)
+    failed_id = start(api, failed_item).data["id"]
+
+    Application.objects.filter(pk=failed_id).update(
+        status=Application.Status.FAILED
+    )
+
+    response = api.get("/api/applications/response-analytics/")
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 0
+    assert response.data["response_count"] == 0
+    assert response.data["response_rate"] == 0
+    assert response.data["by_platform"] == []
