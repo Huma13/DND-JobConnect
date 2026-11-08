@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from accounts.gates import disclaimer_accepted, disclaimer_required_response
+from resume_parser.models import Profile
 from scheduler.models import ScheduledRun
 from scheduler.tasks import search_task
 
@@ -49,12 +50,25 @@ class FeedViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Gen
         """Start a manual search now. Runs in the worker; poll the run for results."""
         if request.user.automation_paused:
             return Response({"detail": "Automation is paused."}, status=status.HTTP_409_CONFLICT)
+
         if not disclaimer_accepted(request.user):
             return disclaimer_required_response()
+
+        # Check whether the user has completed the essential profile field
+        profile = Profile.objects.filter(user=request.user).first()
+        if not profile or not profile.preferred_roles:
+            return Response(
+                {"detail": "Please add at least one preferred role to your profile before searching."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         active = ScheduledRun.objects.filter(user=request.user, status=ScheduledRun.Status.RUNNING).first()
         if active:
-            return Response({"run_id": active.pk, "detail": "A search is already running."},
-                            status=status.HTTP_409_CONFLICT)
+            return Response(
+                {"run_id": active.pk, "detail": "A search is already running."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
         run = ScheduledRun.objects.create(user=request.user, trigger=ScheduledRun.Trigger.MANUAL)
         search_task.delay(request.user.pk, run_id=run.pk)
         return Response({"run_id": run.pk}, status=status.HTTP_202_ACCEPTED)
