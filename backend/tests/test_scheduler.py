@@ -1,15 +1,14 @@
 """Issues #32 (REQ-18), #33 (REQ-19), #34 (REQ-20), SRS 6.2. TC-19, TC-20, TC-21, TC-29."""
 import json
 import threading
-from django.core import mail
-
-from applications.models import Notification
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from django.core import mail
 from django.db import connection
 from django_celery_beat.models import PeriodicTask
 
+from applications.models import Notification
 from integrations.base import SourceError
 from scheduler.models import RateLimitWindow, Schedule, ScheduledRun
 from scheduler.ratelimit import Allowed, Deferred, acquire, hold_threshold, mark_exhausted
@@ -296,7 +295,7 @@ def test_successful_run_sends_new_match_and_run_result_notifications(
     )
 
     with django_capture_on_commit_callbacks(execute=True):
-        run_id = search_task(user.pk)
+        search_task(user.pk)
 
     kinds = list(
         Notification.objects.filter(user=user)
@@ -325,7 +324,6 @@ def test_failed_run_sends_run_result_notification(
 
     with django_capture_on_commit_callbacks(execute=True):
         run_id = search_task(user.pk)
-
     run = ScheduledRun.objects.get(pk=run_id)
 
     assert run.status == "failed"
