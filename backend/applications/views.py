@@ -466,17 +466,24 @@ class ApplicationViewSet(
         if new_status == app.status:
             return Response(ApplicationSerializer(app).data)
 
+        old_status = app.status
+
         with transaction.atomic():
             ApplicationStatusHistory.objects.create(
                 application=app,
                 user=request.user,
-                old_status=app.status,
+                old_status=old_status,
                 new_status=new_status,
             )
+
             app.status = new_status
             app.save(update_fields=["status", "updated_at"])
 
+        # Send notification only after the status update commits.
+        services.notify_status_change(app, old_status)
+
         return Response(ApplicationSerializer(app).data)
+
 
     @action(detail=False, methods=["get"], url_path="export")
     def export_csv(self, request):
