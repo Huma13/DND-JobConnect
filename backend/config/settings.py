@@ -129,7 +129,24 @@ X_ACCESS_SECRET = env("X_ACCESS_SECRET", "")
 PLATFORM_CREDENTIAL_ENCRYPTION_KEY = env(
     "PLATFORM_CREDENTIAL_ENCRYPTION_KEY", ""
 )
+# Application emails use the user's configured mailbox.
 APPLICATION_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+# Notification emails use the project's independent email configuration.
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = env(
+    "DEFAULT_FROM_EMAIL",
+    "notifications@dnd-jobconnect.local",
+)
+EMAIL_HOST = env("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(env("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env("EMAIL_USE_TLS", "1") == "1"
+EMAIL_USE_SSL = env("EMAIL_USE_SSL", "0") == "1"
 
 SOURCE_TIMEOUT_SECONDS = 20          # per source; whole search stays under the 30 s target (SRS 6.1)
 

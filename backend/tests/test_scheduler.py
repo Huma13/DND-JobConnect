@@ -1,6 +1,9 @@
 """Issues #32 (REQ-18), #33 (REQ-19), #34 (REQ-20), SRS 6.2. TC-19, TC-20, TC-21, TC-29."""
 import json
 import threading
+from django.core import mail
+
+from applications.models import Notification
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -274,3 +277,83 @@ def test_health_endpoint(client):
 def test_register_and_login(client):
     assert client.post("/api/auth/register/", {"email": "n@pes.edu", "password": "Str0ng!pass9"}).status_code == 201
     assert "access" in client.post("/api/auth/login/", {"email": "n@pes.edu", "password": "Str0ng!pass9"}).json()
+
+# ---- Issue #40: Email and In-App Notifications -------------------------------
+
+@pytest.mark.django_db
+def test_successful_run_sends_new_match_and_run_result_notifications(
+    user, monkeypatch, settings, django_capture_on_commit_callbacks
+):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    settings.DEFAULT_FROM_EMAIL = "notifications@test.com"
+
+    patch_sources(
+        monkeypatch,
+        {
+            p: FakeSource(p, [posting(p, p)])
+            for p in ("linkedin", "x", "naukri")
+        },
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        run_id = search_task(user.pk)
+
+    kinds = list(
+        Notification.objects.filter(user=user)
+        .values_list("kind", flat=True)
+    )
+
+    assert "new_matches" in kinds
+    assert "run_result" in kinds
+    assert len(mail.outbox) == 2
+
+
+@pytest.mark.django_db
+def test_failed_run_sends_run_result_notification(
+    user, monkeypatch, settings, django_capture_on_commit_callbacks
+):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    settings.DEFAULT_FROM_EMAIL = "notifications@test.com"
+
+    patch_sources(
+        monkeypatch,
+        {
+            p: FakeSource(p, error=SourceError("down"))
+            for p in ("linkedin", "x", "naukri")
+        },
+    )
+
+    with django_capture_on_commit_callbacks(execute=True):
+        run_id = search_task(user.pk)
+
+    run = ScheduledRun.objects.get(pk=run_id)
+
+    assert run.status == "failed"
+    assert Notification.objects.filter(
+        user=user,
+        kind="run_result",
+    ).exists()
+    assert len(mail.outbox) == 1
+
+
+@pytest.mark.django_db
+def test_paused_run_sends_skipped_notification(
+    user, settings, django_capture_on_commit_callbacks
+):
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    settings.DEFAULT_FROM_EMAIL = "notifications@test.com"
+
+    user.automation_paused = True
+    user.save(update_fields=["automation_paused"])
+
+    with django_capture_on_commit_callbacks(execute=True):
+        run_id = search_task(user.pk)
+
+    run = ScheduledRun.objects.get(pk=run_id)
+
+    assert run.status == "skipped"
+    assert Notification.objects.filter(
+        user=user,
+        kind="run_result",
+    ).exists()
+    assert len(mail.outbox) == 1
