@@ -5,6 +5,19 @@ from .models import Profile
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    skills = serializers.ListField(
+        child=serializers.CharField(max_length=100, allow_blank=False),
+        allow_empty=True,
+    )
+    preferred_roles = serializers.ListField(
+        child=serializers.CharField(max_length=100, allow_blank=False),
+        allow_empty=True,
+    )
+    preferred_locations = serializers.ListField(
+        child=serializers.CharField(max_length=100, allow_blank=False),
+        allow_empty=True,
+    )
+
     class Meta:
         model = Profile
         fields = [
@@ -18,16 +31,15 @@ class ProfileSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["updated_at"]
 
-    def validate_skills(self, value):
-        if not isinstance(value, list):
-            raise serializers.ValidationError("Skills must be a list.")
-
-        if not all(isinstance(item, str) and item.strip() for item in value):
+    def validate_years_of_experience(self, value):
+        if value > 99:
             raise serializers.ValidationError(
-                "Every skill must be a non-empty string."
+                "Years of experience cannot exceed 99."
             )
+        return value
 
-        return [item.strip() for item in value]
+    def validate_skills(self, value):
+        return self.validate_string_list(value, "Skills")
 
     def validate_preferred_roles(self, value):
         return self.validate_string_list(value, "Preferred roles")
@@ -47,4 +59,4 @@ class ProfileSerializer(serializers.ModelSerializer):
                 f"Every {field_name.lower()} entry must be a non-empty string."
             )
 
-        return [item.strip() for item in value]
+        return list(dict.fromkeys(item.strip() for item in value))

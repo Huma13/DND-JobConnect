@@ -6,6 +6,7 @@ Or use loadtest/run_degradation.py for the pass/fail check.
 """
 import itertools
 import random
+from datetime import date, timedelta
 
 from locust import HttpUser, between, task
 
@@ -46,7 +47,10 @@ class JobSeeker(HttpUser):
 
     @task(1)
     def dashboard(self):
-        # Analytics dashboard (REQ-21) is owned by another story; skip until the endpoint exists.
-        with self.client.get("/api/analytics/dashboard/", name="dashboard", catch_response=True) as r:
-            if r.status_code == 404:
-                r.success()
+        # TC-31: the analytics dashboard loads these three endpoints together.
+        end = date.today()
+        start = end - timedelta(days=30)
+        self.client.get(f"/api/applications/statistics/?start_date={start}&end_date={end}",
+                        name="dashboard: statistics")
+        self.client.get("/api/applications/response-analytics/", name="dashboard: response rate")
+        self.client.get("/api/applications/", name="dashboard: history")

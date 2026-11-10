@@ -9,6 +9,7 @@ from matching.dedup import dedup_key, normalize_company, normalize_title
 from matching.models import FeedItem, JobPosting, SearchPreference
 from matching.scoring import ProfileView, score
 from matching.services import rescore_feed, run_search
+from resume_parser.models import Profile
 
 from .conftest import make_user
 from .fakes import FakeSource, factory, posting
@@ -231,3 +232,42 @@ def test_preferences_created_with_all_platforms(user):
     from matching.services import selected_platforms
     assert set(selected_platforms(user)) == {"linkedin", "x", "naukri"}
     assert SearchPreference.objects.filter(user=user).count() == 1
+
+# ---- Issue #42: New-user onboarding search validation ----------------
+
+@pytest.mark.django_db
+def test_onboarding_search_rejects_user_without_preferred_roles(api):
+    profile = Profile.objects.get(user=api.user)
+    profile.preferred_roles = []
+    profile.save()
+
+    response = api.post("/api/jobs/feed/search/")
+
+    assert response.status_code == 400
+    assert "preferred role" in response.json()["detail"].lower()
+
+
+@pytest.mark.django_db
+def test_onboarding_search_starts_with_completed_profile(api, monkeypatch):
+    profile = Profile.objects.get(user=api.user)
+    profile.skills = ["Python"]
+    profile.preferred_roles = ["Software Developer"]
+    profile.preferred_locations = ["Bengaluru"]
+    profile.save()
+
+    from matching import views
+
+    queued = {}
+    monkeypatch.setattr(
+        views.search_task,
+        "delay",
+        lambda user_id, run_id=None: queued.update(
+            user_id=user_id, run_id=run_id
+        ),
+    )
+
+    response = api.post("/api/jobs/feed/search/")
+
+    assert response.status_code == 202
+    assert "run_id" in response.json()
+    assert queued["user_id"] == api.user.pk

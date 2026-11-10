@@ -3,7 +3,14 @@ import pytest
 import responses
 from django.core import mail
 
-from applications.models import Application, ApplicationAttempt, MailboxConfig, Notification
+from applications.models import (
+    Application,
+    ApplicationAttempt,
+    ApplicationResponse,
+    ApplicationStatusHistory,
+    MailboxConfig,
+    Notification,
+)
 from integrations.ats import GreenhouseAdapter, LeverAdapter, detect_ats, get_ats_adapter
 from integrations.base import CaptchaDetected, SubmitError
 from matching.models import FeedItem, JobPosting
@@ -389,3 +396,464 @@ def test_pause_all_blocks_submission(api):
     api.post("/api/auth/pause/", {"paused": True}, format="json")
     r = api.post(f"/api/applications/{app['id']}/submit/", {"confirmed": True}, format="json")
     assert r.status_code == 409
+
+
+# ---- #36 Manual application status change -----------------------------------
+
+@pytest.mark.django_db
+def test_manual_status_change_is_saved_with_history(api):
+    item = make_item(api.user)
+    app = start(api, item).data
+
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "applied"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["status"] == "applied"
+
+    history = ApplicationStatusHistory.objects.get(application_id=app["id"])
+    assert history.old_status == "draft"
+    assert history.new_status == "applied"
+    assert history.user == api.user
+
+
+@pytest.mark.django_db
+def test_manual_status_change_same_status_does_not_create_history(api):
+    item = make_item(api.user)
+    app = start(api, item).data
+
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "draft"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert ApplicationStatusHistory.objects.filter(application_id=app["id"]).count() == 0
+
+
+@pytest.mark.django_db
+def test_manual_status_change_rejects_invalid_status(api):
+    item = make_item(api.user)
+    app = start(api, item).data
+
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "invalid"},
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert ApplicationStatusHistory.objects.filter(application_id=app["id"]).count() == 0
+
+
+@pytest.mark.django_db
+def test_user_cannot_change_another_users_application(api):
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    from .conftest import make_user
+
+    other_user = make_user("other@example.com")
+    item = make_item(other_user, ext="foreign-36")
+
+    # Create an application belonging to the other user.
+    other_api = APIClient()
+    other_api.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(other_user).access_token}"
+    )
+    app = start(other_api, item).data
+
+    # Try changing it using the original user's API client.
+    response = api.patch(
+        f"/api/applications/{app['id']}/change-status/",
+        {"status": "applied"},
+        format="json",
+    )
+
+    assert response.status_code == 404
+    assert ApplicationStatusHistory.objects.filter(
+        application_id=app["id"]
+    ).count() == 0
+
+
+# ---- #38 Export application history as CSV -------------------------------
+
+@pytest.mark.django_db
+def test_application_history_can_be_exported_as_csv(api):
+    item = make_item(api.user)
+    start(api, item)
+
+    response = api.get("/api/applications/export/")
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/csv"
+    assert "attachment; filename=\"application_history.csv\"" in response[
+        "Content-Disposition"
+    ]
+
+    content = response.content.decode("utf-8")
+    assert "Application ID" in content
+    assert "Job Title" in content
+    assert "Company" in content
+
+
+@pytest.mark.django_db
+def test_application_csv_contains_application_details(api):
+    item = make_item(api.user)
+    app = start(api, item).data
+
+    response = api.get("/api/applications/export/")
+    content = response.content.decode("utf-8")
+
+    assert str(app["id"]) in content
+    assert item.posting.title in content
+    assert item.posting.company in content
+
+
+
+
+
+@pytest.mark.django_db
+def test_application_csv_only_contains_current_users_applications(api):
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    from .conftest import make_user
+
+    # Create an application for the logged-in user.
+    item = make_item(api.user)
+    start(api, item)
+
+    # Create another user's application.
+    other_user = make_user("other-csv@example.com")
+    other_item = make_item(other_user, ext="foreign-csv")
+    other_item.posting.title = "Foreign User Exclusive Job"
+    other_item.posting.save(update_fields=["title"])
+
+    other_api = APIClient()
+    other_api.credentials(
+        HTTP_AUTHORIZATION=f"Bearer {RefreshToken.for_user(other_user).access_token}"
+    )
+    start(other_api, other_item)
+
+    # Export using the original user's client.
+    response = api.get("/api/applications/export/")
+    content = response.content.decode("utf-8")
+
+    assert response.status_code == 200
+    assert item.posting.title in content
+    assert other_item.posting.title not in content
+
+# ---- #39 keyword response analytics -----------------------------------------------
+
+@pytest.mark.django_db
+def test_keyword_analytics_counts_applications_and_responses(api):
+    item1 = make_item(api.user, ext="keyword-1")
+    item1.posting.skills = ["Python", "SQL"]
+    item1.posting.save()
+
+    item2 = make_item(api.user, ext="keyword-2")
+    item2.posting.skills = ["Python", "Docker"]
+    item2.posting.save()
+
+    app1_id = start(api, item1).data["id"]
+    app2_id = start(api, item2).data["id"]
+
+    api.post(f"/api/applications/{app1_id}/mark-applied/")
+    api.post(f"/api/applications/{app2_id}/mark-applied/")
+
+    app1 = Application.objects.get(pk=app1_id)
+
+    ApplicationResponse.objects.create(
+        application=app1,
+        user=api.user,
+        response_type=ApplicationResponse.Type.REPLY,
+        note="Employer replied",
+    )
+
+    response = api.get("/api/applications/keyword-analytics/")
+
+    assert response.status_code == 200
+
+    results = {item["keyword"]: item for item in response.data["keywords"]}
+
+    assert results["Python"]["application_count"] == 2
+    assert results["Python"]["response_count"] == 1
+    assert results["Python"]["response_rate"] == 50.0
+
+    assert results["SQL"]["application_count"] == 1
+    assert results["SQL"]["response_count"] == 1
+
+    assert results["Docker"]["application_count"] == 1
+    assert results["Docker"]["response_count"] == 0
+
+
+@pytest.mark.django_db
+def test_keyword_analytics_does_not_double_count_multiple_responses(api):
+    item = make_item(api.user, ext="keyword-multiple")
+    item.posting.skills = ["Python"]
+    item.posting.save()
+
+    app_id = start(api, item).data["id"]
+    api.post(f"/api/applications/{app_id}/mark-applied/")
+
+    application = Application.objects.get(pk=app_id)
+
+    for response_type in (
+        ApplicationResponse.Type.REPLY,
+        ApplicationResponse.Type.INTERVIEW,
+    ):
+        ApplicationResponse.objects.create(
+            application=application,
+            user=api.user,
+            response_type=response_type,
+        )
+
+    response = api.get("/api/applications/keyword-analytics/")
+    python_result = next(
+        item for item in response.data["keywords"]
+        if item["keyword"] == "Python"
+    )
+
+    assert python_result["application_count"] == 1
+    assert python_result["response_count"] == 1
+    assert python_result["response_rate"] == 100.0
+
+
+@pytest.mark.django_db
+def test_keyword_analytics_does_not_include_other_users_applications(api):
+    from .conftest import make_user
+
+    other_user = make_user("other-keyword@pes.edu", skills=["Python"])
+
+    item = make_item(other_user, ext="other-keyword")
+    item.posting.skills = ["Python"]
+    item.posting.save()
+
+    response = api.get("/api/applications/keyword-analytics/")
+
+    python_result = next(
+        item for item in response.data["keywords"]
+        if item["keyword"] == "Python"
+    )
+
+    assert python_result["application_count"] == 0
+    assert python_result["response_count"] == 0
+
+
+# ---- #35 application statistics by platform and status ----------------------------
+
+@pytest.mark.django_db
+def test_application_statistics_counts_by_platform_and_status(api):
+    naukri_item = make_item(api.user, platform="naukri", ext="stats-naukri")
+    linkedin_item = make_item(
+        api.user,
+        platform="linkedin",
+        url="https://www.linkedin.com/jobs/view/12345",
+        ext="stats-linkedin",
+    )
+
+    start(api, naukri_item)
+    linkedin_app = start(api, linkedin_item).data
+
+    # Change one application from draft to applied.
+    api.post(f"/api/applications/{linkedin_app['id']}/mark-applied/")
+
+    response = api.get(
+        "/api/applications/statistics/",
+        {"start_date": "2026-01-01", "end_date": "2026-12-31"},
+    )
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 2
+
+    assert {
+        item["platform"]: item["count"]
+        for item in response.data["by_platform"]
+    } == {
+        "naukri": 1,
+        "linkedin": 1,
+    }
+
+    assert {
+        item["status"]: item["count"]
+        for item in response.data["by_status"]
+    } == {
+        "draft": 1,
+        "applied": 1,
+    }
+
+
+@pytest.mark.django_db
+def test_application_statistics_filters_by_date_range(api):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    item1 = make_item(api.user, ext="stats-date-inside")
+    item2 = make_item(api.user, ext="stats-date-outside")
+
+    app1 = start(api, item1).data
+    app2 = start(api, item2).data
+
+    today = timezone.now()
+    Application.objects.filter(pk=app1["id"]).update(
+        created_at=today - timedelta(days=2)
+    )
+    Application.objects.filter(pk=app2["id"]).update(
+        created_at=today - timedelta(days=10)
+    )
+
+    selected_date = (today - timedelta(days=3)).date()
+
+    response = api.get(
+        "/api/applications/statistics/",
+        {
+            "start_date": selected_date.isoformat(),
+            "end_date": today.date().isoformat(),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 1
+
+
+@pytest.mark.django_db
+def test_application_statistics_excludes_other_users(api):
+    from .conftest import make_user
+
+    other_user = make_user("other-stats@example.com")
+    other_item = make_item(other_user, ext="stats-other-user")
+
+    from rest_framework.test import APIClient
+    from rest_framework_simplejwt.tokens import RefreshToken
+
+    other_api = APIClient()
+    other_api.credentials(
+        HTTP_AUTHORIZATION=(
+            f"Bearer {RefreshToken.for_user(other_user).access_token}"
+        )
+    )
+    start(other_api, other_item)
+
+    response = api.get(
+        "/api/applications/statistics/",
+        {"start_date": "2026-01-01", "end_date": "2026-12-31"},
+    )
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 0
+    assert response.data["by_platform"] == []
+    assert response.data["by_status"] == []
+
+
+@pytest.mark.django_db
+def test_application_statistics_requires_both_dates(api):
+    response = api.get(
+        "/api/applications/statistics/",
+        {"start_date": "2026-01-01"},
+    )
+
+    assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_application_statistics_rejects_invalid_date_range(api):
+    response = api.get(
+        "/api/applications/statistics/",
+        {"start_date": "2026-12-31", "end_date": "2026-01-01"},
+    )
+
+    assert response.status_code == 400
+
+# ---- #37 response-rate analytics -----------------------------------------------
+
+@pytest.mark.django_db
+def test_response_analytics_calculates_overall_and_platform_rates(api):
+    naukri_item = make_item(api.user, platform="naukri", ext="response-naukri")
+    linkedin_item = make_item(
+        api.user,
+        platform="linkedin",
+        url="https://www.linkedin.com/jobs/view/12345",
+        ext="response-linkedin",
+    )
+
+    naukri_id = start(api, naukri_item).data["id"]
+    linkedin_id = start(api, linkedin_item).data["id"]
+
+    api.post(f"/api/applications/{naukri_id}/mark-applied/")
+    api.post(f"/api/applications/{linkedin_id}/mark-applied/")
+
+    application = Application.objects.get(pk=naukri_id)
+
+    ApplicationResponse.objects.create(
+        application=application,
+        user=api.user,
+        response_type=ApplicationResponse.Type.REPLY,
+    )
+
+    response = api.get("/api/applications/response-analytics/")
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 2
+    assert response.data["response_count"] == 1
+    assert response.data["response_rate"] == 50.0
+
+    platforms = {
+        item["platform"]: item
+        for item in response.data["by_platform"]
+    }
+
+    assert platforms["naukri"]["response_rate"] == 100.0
+    assert platforms["linkedin"]["response_rate"] == 0.0
+
+
+@pytest.mark.django_db
+def test_response_analytics_does_not_double_count_responses(api):
+    item = make_item(api.user, ext="response-multiple")
+    app_id = start(api, item).data["id"]
+
+    api.post(f"/api/applications/{app_id}/mark-applied/")
+
+    application = Application.objects.get(pk=app_id)
+
+    for response_type in (
+        ApplicationResponse.Type.REPLY,
+        ApplicationResponse.Type.INTERVIEW,
+    ):
+        ApplicationResponse.objects.create(
+            application=application,
+            user=api.user,
+            response_type=response_type,
+        )
+
+    response = api.get("/api/applications/response-analytics/")
+
+    assert response.data["total_applications"] == 1
+    assert response.data["response_count"] == 1
+    assert response.data["response_rate"] == 100.0
+
+
+@pytest.mark.django_db
+def test_response_analytics_excludes_ineligible_applications(api):
+    draft_item = make_item(api.user, ext="response-draft")
+    failed_item = make_item(api.user, ext="response-failed")
+
+    start(api, draft_item)
+    failed_id = start(api, failed_item).data["id"]
+
+    Application.objects.filter(pk=failed_id).update(
+        status=Application.Status.FAILED
+    )
+
+    response = api.get("/api/applications/response-analytics/")
+
+    assert response.status_code == 200
+    assert response.data["total_applications"] == 0
+    assert response.data["response_count"] == 0
+    assert response.data["response_rate"] == 0
+    assert response.data["by_platform"] == []
