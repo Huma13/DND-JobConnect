@@ -39,3 +39,12 @@ def test_demo_search_fills_feed_and_dedupes_across_platforms(settings, user):
     assert result.duplicates >= 1
     top = FeedItem.objects.filter(user=user, duplicate_of__isnull=True).first()
     assert top.relevance >= 60
+
+
+def test_demo_postings_exercise_outreach_and_career_page_apply():
+    from integrations.ats import detect_ats
+
+    rows = _load()
+    assert any("linkedin.com/in/" in r["description"] for r in rows)
+    assert any(detect_ats(r["url"]) == "greenhouse" for r in rows)
+    assert any(detect_ats(r["url"]) == "lever" for r in rows)

@@ -12,7 +12,7 @@
       "PostgreSQL",
       "Docker"
     ],
-    "description": "Build REST APIs with Django and DRF. 1-3 years experience. Celery, Redis a plus.",
+    "description": "Build REST APIs with Django and DRF. 1-3 years experience. Celery, Redis a plus. Hiring manager: https://www.linkedin.com/in/ananya-rao-northwind",
     "url": "https://jobs.example.com/linkedin/1"
   },
   {
@@ -41,7 +41,7 @@
       "Python",
       "Django"
     ],
-    "description": "#hiring #python Backend role on our payments team. DM or apply via careers page.",
+    "description": "#hiring #python Backend role on our payments team. DM or apply via careers page. Questions? Ping @northwind_hr",
     "url": "https://jobs.example.com/x/3"
   },
   {
@@ -57,7 +57,7 @@
       "SQL",
       "AWS"
     ],
-    "description": "Train and deploy ML models. 0-2 years. Strong Python and SQL.",
+    "description": "Train and deploy ML models. 0-2 years. Strong Python and SQL. Recruiter: https://www.linkedin.com/in/karthik-menon-lumen",
     "url": "https://jobs.example.com/linkedin/4"
   },
   {
@@ -166,7 +166,7 @@
       "CI/CD"
     ],
     "description": "Own CI/CD pipelines and Kubernetes clusters. 2-4 years.",
-    "url": "https://jobs.example.com/linkedin/11"
+    "url": "https://jobs.lever.co/cirrus/11"
   },
   {
     "id": 12,
@@ -211,7 +211,7 @@
       "Redis"
     ],
     "description": "Backend services for checkout. Python or Go. 0-2 years.",
-    "url": "https://jobs.example.com/linkedin/14"
+    "url": "https://boards.greenhouse.io/tidewave/jobs/14"
   },
   {
     "id": 15,
@@ -256,7 +256,7 @@
       "Deep Learning"
     ],
     "description": "6-month internship for final-year students in AI/ML.",
-    "url": "https://jobs.example.com/linkedin/17"
+    "url": "https://boards.greenhouse.io/pinecrest/jobs/17"
   },
   {
     "id": 18,
