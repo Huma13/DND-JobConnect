@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   LogOut,
+  UserRound,
   UsersRound,
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './auth/AuthContext.jsx'
@@ -14,8 +15,10 @@ import AnalyticsDashboard from './components/AnalyticsDashboard.jsx'
 import OutreachPanel from './components/OutreachPanel.jsx'
 import ReviewQueue from './components/ReviewQueue.jsx'
 import LoginPage from './pages/LoginPage.jsx'
+import ProfilePage from './pages/ProfilePage.jsx'
 
 const NAV_ITEMS = [
+  { to: '/profile', label: 'Profile', icon: UserRound },
   { to: '/analytics', label: 'Analytics', icon: LayoutDashboard },
   { to: '/review', label: 'Review', icon: ClipboardCheck },
   { to: '/outreach', label: 'Outreach', icon: UsersRound },
@@ -131,6 +134,7 @@ export default function App() {
           <Route element={<RequireAuth />}>
             <Route element={<Layout toast={toast} />}>
               <Route path="/" element={<Navigate to="/analytics" replace />} />
+              <Route path="/profile" element={<ProfilePage onToast={showToast} />} />
               <Route path="/analytics" element={<AnalyticsDashboard onToast={showToast} />} />
               <Route path="/review" element={<ReviewQueue onToast={showToast} />} />
               <Route path="/outreach" element={<OutreachPanel onToast={showToast} />} />
