@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Settings,
   UserRound,
   UsersRound,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import ReviewQueue from './components/ReviewQueue.jsx'
 import FeedPage from './pages/FeedPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
+import SettingsPage from './pages/SettingsPage.jsx'
 
 const NAV_ITEMS = [
   { to: '/feed', label: 'Job feed', icon: ListChecks },
@@ -25,6 +27,7 @@ const NAV_ITEMS = [
   { to: '/analytics', label: 'Analytics', icon: LayoutDashboard },
   { to: '/review', label: 'Review', icon: ClipboardCheck },
   { to: '/outreach', label: 'Outreach', icon: UsersRound },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 function navLinkClass({ isActive }) {
@@ -141,6 +144,7 @@ export default function App() {
               <Route path="/profile" element={<ProfilePage onToast={showToast} />} />
               <Route path="/analytics" element={<AnalyticsDashboard onToast={showToast} />} />
               <Route path="/review" element={<ReviewQueue onToast={showToast} />} />
+              <Route path="/settings" element={<SettingsPage onToast={showToast} />} />
               <Route path="/outreach" element={<OutreachPanel onToast={showToast} />} />
             </Route>
           </Route>
