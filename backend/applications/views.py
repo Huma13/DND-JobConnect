@@ -485,6 +485,29 @@ class ApplicationViewSet(
         return Response(ApplicationSerializer(app).data)
 
 
+    @action(detail=True, methods=["get", "post"], url_path="responses")
+    def responses(self, request, pk=None):
+        """REQ-22/23: log an employer reply or interview invitation for an application.
+
+        GET lists them; POST {"response_type": "reply"|"interview", "note": ""} adds one.
+        These rows feed the response-rate and keyword-yield analytics.
+        """
+        app = self.get_object()
+        if request.method == "POST":
+            response_type = request.data.get("response_type")
+            valid = [choice[0] for choice in ApplicationResponse.Type.choices]
+            if response_type not in valid:
+                raise ValidationError({"response_type": f"Choose one of: {', '.join(valid)}."})
+            ApplicationResponse.objects.create(
+                application=app, user=request.user, response_type=response_type,
+                note=str(request.data.get("note", ""))[:2000],
+            )
+        rows = app.employer_responses.filter(user=request.user).order_by("-received_at")
+        return Response(
+            [{"response_type": r.response_type, "note": r.note, "received_at": r.received_at} for r in rows],
+            status=status.HTTP_201_CREATED if request.method == "POST" else status.HTTP_200_OK,
+        )
+
     @action(detail=False, methods=["get"], url_path="export")
     def export_csv(self, request):
         """Export the user's application history as CSV (Issue #38)."""
