@@ -104,3 +104,80 @@ class MailboxConfig(models.Model):
     password_encrypted = models.TextField()
     from_email = models.EmailField()
     use_tls = models.BooleanField(default=True)
+
+
+class ApplicationStatusHistory(models.Model):
+    """Records every manual status change made to an application."""
+
+    application = models.ForeignKey(
+        Application,
+        on_delete=models.CASCADE,
+        related_name="status_history",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="application_status_changes",
+    )
+    old_status = models.CharField(max_length=30, choices=Application.Status.choices)
+    new_status = models.CharField(max_length=30, choices=Application.Status.choices)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-changed_at", "-id"]
+
+    def __str__(self):
+        return f"Application {self.application_id}: {self.old_status} → {self.new_status}"
+
+class ApplicationResponse(models.Model):
+    """Tracks employer replies and interview invitations."""
+
+    class Type(models.TextChoices):
+        REPLY = "reply", "Employer Reply"
+        INTERVIEW = "interview", "Interview Invitation"
+
+    application = models.ForeignKey(
+        Application,
+        on_delete=models.CASCADE,
+        related_name="employer_responses",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="application_responses",
+    )
+    response_type = models.CharField(max_length=20, choices=Type.choices)
+    note = models.TextField(blank=True)
+    received_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-received_at", "-id"]
+
+    def __str__(self):
+        return f"{self.application_id} - {self.response_type}"
+
+class PlatformCredential(models.Model):
+    """Encrypted, write-only credentials for a user's platform account."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="platform_credentials",
+    )
+    platform = models.CharField(
+        max_length=20,
+        choices=Platform.choices,
+    )
+    credentials_encrypted = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "platform"],
+                name="uniq_user_platform_credential",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}: {self.platform} credentials"

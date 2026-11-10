@@ -113,6 +113,11 @@ CELERY_TIMEZONE = "Asia/Kolkata"
 
 # ---- Job sources (SRS 3.2) -------------------------------------------------
 X_BEARER_TOKEN = env("X_BEARER_TOKEN", "")
+# Serve every job source from integrations/demo_data/postings.json (for demos and screenshots).
+DEMO_SOURCES = env("DEMO_SOURCES", "0") == "1"
+# seed_demo points the demo user's mailbox here (the Mailpit container in docker-compose).
+DEMO_SMTP_HOST = env("DEMO_SMTP_HOST", "localhost")
+DEMO_SMTP_PORT = int(env("DEMO_SMTP_PORT", "1025"))
 COLLECTOR_USER_AGENT = env(
     "COLLECTOR_USER_AGENT",
     "DND-JobConnectBot/1.0 (+https://github.com/Huma13/DND-JobConnect)",
@@ -126,7 +131,27 @@ X_API_KEY = env("X_API_KEY", "")
 X_API_SECRET = env("X_API_SECRET", "")
 X_ACCESS_TOKEN = env("X_ACCESS_TOKEN", "")
 X_ACCESS_SECRET = env("X_ACCESS_SECRET", "")
+PLATFORM_CREDENTIAL_ENCRYPTION_KEY = env(
+    "PLATFORM_CREDENTIAL_ENCRYPTION_KEY", ""
+)
+# Application emails use the user's configured mailbox.
 APPLICATION_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+# Notification emails use the project's independent email configuration.
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = env(
+    "DEFAULT_FROM_EMAIL",
+    "notifications@dnd-jobconnect.local",
+)
+EMAIL_HOST = env("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(env("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env("EMAIL_USE_TLS", "1") == "1"
+EMAIL_USE_SSL = env("EMAIL_USE_SSL", "0") == "1"
 
 SOURCE_TIMEOUT_SECONDS = 20          # per source; whole search stays under the 30 s target (SRS 6.1)
 
