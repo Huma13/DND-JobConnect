@@ -24,7 +24,7 @@ from applications.models import (
     ApplyKit,
     MailboxConfig,
 )
-from applications.services import encrypt_password
+from applications.services import encrypt_password, notify_captcha
 from matching.models import FeedItem, SearchPreference
 from matching.services import run_search
 from resume_parser.models import Profile
@@ -113,6 +113,8 @@ class Command(BaseCommand):
                            "manual_review_required": "captcha"}[status]
                 a = ApplicationAttempt.objects.create(user=user, application=app, platform=platform, status=attempt)
                 ApplicationAttempt.objects.filter(pk=a.pk).update(created_at=when)
+            if status == "manual_review_required":
+                notify_captcha(app)  # REQ-13: the in-app notice the user would have received
             h = ApplicationStatusHistory.objects.create(application=app, user=user,
                                                         old_status="draft", new_status=status)
             ApplicationStatusHistory.objects.filter(pk=h.pk).update(changed_at=when)
