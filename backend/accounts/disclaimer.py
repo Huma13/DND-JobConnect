@@ -3,12 +3,12 @@
 Change DISCLAIMER_VERSION whenever the text changes, so everyone has to accept it again.
 """
 
-DISCLAIMER_VERSION = "1.0"
+DISCLAIMER_VERSION = "1.1"
 
 DISCLAIMER_TEXT = (
-    "HAND-JobConnect submits job applications and sends outreach messages using your own "
+    "DND-JobConnect submits job applications and sends outreach messages using your own "
     "platform credentials and with your consent. You are responsible for what is sent from "
-    "your accounts. Team HAND and PES University are not liable for any action a platform "
+    "your accounts. Team DND and PES University are not liable for any action a platform "
     "takes on your account (for example a suspension) if you go beyond the recommended "
     "daily usage limits."
 )
