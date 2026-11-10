@@ -5,6 +5,7 @@ import {
   CircleCheck,
   ClipboardCheck,
   LayoutDashboard,
+  ListChecks,
   LogOut,
   UserRound,
   UsersRound,
@@ -14,10 +15,12 @@ import DisclaimerGate from './auth/DisclaimerGate.jsx'
 import AnalyticsDashboard from './components/AnalyticsDashboard.jsx'
 import OutreachPanel from './components/OutreachPanel.jsx'
 import ReviewQueue from './components/ReviewQueue.jsx'
+import FeedPage from './pages/FeedPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 
 const NAV_ITEMS = [
+  { to: '/feed', label: 'Job feed', icon: ListChecks },
   { to: '/profile', label: 'Profile', icon: UserRound },
   { to: '/analytics', label: 'Analytics', icon: LayoutDashboard },
   { to: '/review', label: 'Review', icon: ClipboardCheck },
@@ -133,7 +136,8 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<RequireAuth />}>
             <Route element={<Layout toast={toast} />}>
-              <Route path="/" element={<Navigate to="/analytics" replace />} />
+              <Route path="/" element={<Navigate to="/feed" replace />} />
+              <Route path="/feed" element={<FeedPage onToast={showToast} />} />
               <Route path="/profile" element={<ProfilePage onToast={showToast} />} />
               <Route path="/analytics" element={<AnalyticsDashboard onToast={showToast} />} />
               <Route path="/review" element={<ReviewQueue onToast={showToast} />} />
