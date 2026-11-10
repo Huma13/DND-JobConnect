@@ -1,17 +1,52 @@
 # DND-JobConnect
 
-LinkedIn and Social Media–Driven Automated Job Application System (Project 16, Team HAND).
-Layered Django REST backend per the SW Architecture document.
+LinkedIn and Social Media–Driven Automated Job Application System (Project 16, Team DND).
+A layered Django REST backend and a React web app, per the SW Architecture document.
 
-## Quick start (one command, issue #8)
+## Quick start: the whole app in one command
 
 ```bash
-cp backend/.env.example backend/.env      # set DJANGO_SECRET_KEY and POSTGRES_PASSWORD
+cp backend/.env.example backend/.env      # set DJANGO_SECRET_KEY; add DEMO_SOURCES=1 for a demo
 docker compose up --build
 ```
 
-This starts PostgreSQL 15, Redis, a one-off migration job, the Django API (Gunicorn, port 8000),
-a Celery worker and Celery beat. Check with `curl localhost:8000/health/`.
+| URL | What |
+|---|---|
+| http://localhost:5173 | The web app |
+| http://localhost:8000/admin/ | Django admin |
+| http://localhost:8025 | Mailpit: email applications and notification emails sent in development |
+
+This starts PostgreSQL 15, Redis, a one-off migration job, the Django API (Gunicorn), a Celery worker,
+Celery beat, the web app and Mailpit. Check the API with `curl localhost:8000/health/`.
+
+### Demo data
+
+LinkedIn's and Naukri's robots.txt disallow the public listing pages and X search needs a paid API token,
+so a live search returns nothing without credentials. With `DEMO_SOURCES=1` every source reads recorded
+postings from `backend/integrations/demo_data/postings.json` through the same `IJobSource` interface, so the
+rate limiter, scoring and de-duplication still run.
+
+```bash
+docker compose exec web python manage.py seed_demo
+# log in at http://localhost:5173 as demo@dnd.test / Demo!2026
+```
+
+The demo account has a profile, a ranked feed with cross-platform duplicates merged, eight past
+applications with replies, an interview and a CAPTCHA stop, and a mailbox that sends to Mailpit.
+
+### Web app screens
+
+| Screen | Requirements |
+|---|---|
+| Sign in / create account, legal disclaimer | SRS 6.3, 6.5, 7 |
+| Profile: resume upload, editable profile, optimisation tips | REQ-1 to REQ-4, #12 |
+| Job feed: ranked list, filters, Search now, skip, apply | REQ-5 to REQ-8 |
+| Apply: assisted (LinkedIn/Naukri), career page (Greenhouse/Lever), email | REQ-9, REQ-12 |
+| Review: confirm before anything is sent; retry failures | REQ-10, REQ-13 |
+| Outreach: recruiter suggestions and personalised messages | REQ-14 to REQ-17 |
+| Analytics: statistics, response rate, keyword yield, status changes, CSV export | REQ-21 to REQ-24 |
+| Settings: Pause All, sources, schedule, limits, Full-Auto, mailbox, run log | SRS 6.2, REQ-5, 10, 11, 16, 18-20 |
+| Notification bell | REQ-13 |
 
 ## Local development without Docker
 
@@ -26,6 +61,7 @@ pytest --cov=.                                         # tests run against Postg
 python manage.py runserver
 celery -A config worker -l INFO                        # separate terminal
 celery -A config beat -l INFO                          # separate terminal
+cd ../frontend && npm ci && npm run dev                # web app on :5173, /api proxied to :8000
 ```
 
 ## Layout
@@ -35,13 +71,14 @@ celery -A config beat -l INFO                          # separate terminal
 | `backend/integrations/` | Integration | `IJobSource` interface, X/Tweepy adapter, LinkedIn + Naukri public listing collector |
 | `backend/matching/` | Business | Relevance scoring, de-duplication, feed filters, search service, feed API |
 | `backend/scheduler/` | Business / Data | Celery tasks, beat schedules, rate limiter, run log |
-| `backend/accounts/` | Business | Minimal user model, JWT login, Pause All (the full auth story is separate) |
-| `backend/resume_parser/` | Business | `Profile` model read by matching (the parsing story is separate) |
+| `backend/accounts/` | Business | User model and roles, registration, JWT login, Pause All, legal disclaimer |
+| `backend/resume_parser/` | Business | Resume upload and parsing, editable profile, profile optimisation tips |
 | `backend/applications/` | Business | Apply kit, assisted / career-page / email apply, confirmation gate, daily limits, attempt log, CAPTCHA pause |
 | `backend/outreach/` | Business | Recruiter suggestions, editable outreach drafts, daily limits, identical-message block |
 | `backend/loadtest/` | Testing | Locust scenarios and the 50-user degradation check |
+| `frontend/` | Presentation | React web app (Vite, Tailwind); `src/api/client.js` talks to the API |
 
-## API (this increment)
+## API
 
 All endpoints except register, login and health need `Authorization: Bearer <access token>`.
 
@@ -84,6 +121,9 @@ All under `Authorization: Bearer <token>`. `feed_item` is an id from `/api/jobs/
 | POST | `/api/applications/kits/` `{feed_item}` | REQ-9 kit; `GET .../kits/{id}/download/?part=resume\|cover_letter`, `PATCH .../kits/{id}/edit/` |
 | POST | `/api/applications/` `{feed_item, method: manual\|ats\|email, to_email?}` | #21 assisted (LinkedIn/Naukri), #22 Greenhouse/Lever, #23 email |
 | POST | `/api/applications/{id}/mark-applied/` | #21 track an application you made on the site |
+| PATCH | `/api/applications/{id}/change-status/` | #36 / REQ-22 change the status yourself |
+| GET/POST | `/api/applications/{id}/responses/` `{response_type: reply\|interview}` | REQ-22/23 log an employer reply or interview |
+| GET | `/api/applications/statistics/`, `response-analytics/`, `keyword-analytics/`, `export/` | REQ-21, 23, 24, #39 |
 | GET | `/api/applications/{id}/review/` | REQ-10 content of the review popup |
 | POST | `/api/applications/{id}/submit/` `{confirmed: true}` | REQ-10 needs `confirmed` unless Full-Auto is on for that platform (else 428) |
 | GET/PUT | `/api/applications/limits/` `{platform, daily_limit, full_auto}` | REQ-11 default 20 a day per platform, over it gives 429 |
@@ -123,18 +163,17 @@ hashing is deliberately slow. Steady-state feed requests stay around 15–20 ms.
 search finishes in about 2 s with sources run in parallel (TC-30), that slow sources are cut off, and that a
 filtered 2,000-item feed responds in under 3 s with a fixed number of queries.
 
-The analytics dashboard (TC-31) belongs to the Analytics story. The Locust file already calls
-`/api/analytics/dashboard/` and starts measuring it once that endpoint exists.
+The Locust file also loads the analytics dashboard's endpoints (statistics, response rate, history) for TC-31.
 
 ## CI (issue #6)
 
 `.github/workflows/ci.yml` runs on every PR: ruff lint, a migration check, pytest on PostgreSQL 15 + Redis with an
-85% coverage gate, and a Docker image build. A push to `main` (a merged PR) publishes the image to GitHub
+85% line-and-branch coverage gate, SonarQube, frontend lint and build, and a Docker image build. A push to `main` (a merged PR) publishes the image to GitHub
 Container Registry. To require a passing build and one review before merging, a repo admin runs:
 
 ```bash
 gh api -X PUT repos/Huma13/DND-JobConnect/branches/main/protection --input - <<'JSON'
-{"required_status_checks":{"strict":true,"contexts":["test","docker"]},
+{"required_status_checks":{"strict":true,"contexts":["test","frontend","docker"]},
  "enforce_admins":false,
  "required_pull_request_reviews":{"required_approving_review_count":1},
  "restrictions":null}
