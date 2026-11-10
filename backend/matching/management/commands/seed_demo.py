@@ -22,7 +22,9 @@ from applications.models import (
     ApplicationResponse,
     ApplicationStatusHistory,
     ApplyKit,
+    MailboxConfig,
 )
+from applications.services import encrypt_password
 from matching.models import FeedItem, SearchPreference
 from matching.services import run_search
 from resume_parser.models import Profile
@@ -78,6 +80,10 @@ class Command(BaseCommand):
         user.save(update_fields=["disclaimer_accepted_at", "disclaimer_version"])
         Profile.objects.create(user=user, **PROFILE)
         SearchPreference.objects.update_or_create(user=user, defaults={"platforms": ["linkedin", "naukri", "x"]})
+        # Email apply sends through a local mail catcher, so the demo can show the real message.
+        MailboxConfig.objects.create(user=user, host=settings.DEMO_SMTP_HOST, port=settings.DEMO_SMTP_PORT,
+                                     username="", password_encrypted=encrypt_password("unused"),
+                                     from_email=EMAIL, use_tls=False)
         return user
 
     @transaction.atomic
@@ -91,6 +97,7 @@ class Command(BaseCommand):
                      .exclude(posting__url__contains="greenhouse.io")
                      .exclude(posting__url__contains="lever.co")
                      .exclude(posting__description__contains="linkedin.com/in/")
+                     .exclude(posting__description__regex=r"(^|\s)@\w")
                      .select_related("posting").order_by("-relevance")[2:])
         for (status, method, outcome), item in zip(HISTORY, items, strict=False):
             posting = item.posting
