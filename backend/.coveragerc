@@ -1,4 +1,6 @@
 [run]
+# Branch coverage is a required report for the final submission (lesson plan, Lab 6).
+branch = True
 omit = */migrations/*, manage.py, config/asgi.py, config/wsgi.py, tests/*, loadtest/*
 [report]
 exclude_lines = pragma: no cover
