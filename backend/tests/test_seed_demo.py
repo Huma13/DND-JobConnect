@@ -24,3 +24,14 @@ def test_seed_demo_creates_feed_and_history_and_can_rerun(settings, django_user_
     assert FeedItem.objects.filter(user=user, state="new").exists()
     assert Application.objects.filter(user=user).count() == 8
     assert ApplicationResponse.objects.filter(user=user, response_type="interview").exists()
+
+
+@pytest.mark.django_db
+def test_seed_demo_connects_a_local_mailbox(settings):
+    from applications.models import MailboxConfig
+
+    settings.DEMO_SOURCES = True
+    settings.DEMO_SMTP_HOST = "mailpit"
+    call_command("seed_demo")
+    box = MailboxConfig.objects.get(user__email="demo@dnd.test")
+    assert (box.host, box.port, box.use_tls) == ("mailpit", 1025, False)
