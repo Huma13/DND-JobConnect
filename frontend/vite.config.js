@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import process from 'node:process'
 import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -38,4 +39,10 @@ export default defineConfig({
     tailwindInlineSources(),
     tailwindcss(),
   ],
+  server: {
+    // Forward API calls to Django so the browser sees one origin (no CORS setup needed).
+    proxy: {
+      '/api': process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
+    },
+  },
 })
