@@ -2,6 +2,7 @@
 from django.conf import settings
 
 from .base import IJobSource, SourceError
+from .demo import DemoJobSource
 from .listings import LinkedInListingSource, NaukriListingSource, PoliteFetcher
 from .x_source import XJobSource
 
@@ -16,6 +17,8 @@ def _fetcher() -> PoliteFetcher:
 
 
 def get_source(platform: str) -> IJobSource:
+    if settings.DEMO_SOURCES and platform in ("x", "linkedin", "naukri"):
+        return DemoJobSource(platform)
     if platform == "x":
         return XJobSource(settings.X_BEARER_TOKEN)
     if platform == "linkedin":

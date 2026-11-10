@@ -113,6 +113,8 @@ CELERY_TIMEZONE = "Asia/Kolkata"
 
 # ---- Job sources (SRS 3.2) -------------------------------------------------
 X_BEARER_TOKEN = env("X_BEARER_TOKEN", "")
+# Serve every job source from integrations/demo_data/postings.json (for demos and screenshots).
+DEMO_SOURCES = env("DEMO_SOURCES", "0") == "1"
 COLLECTOR_USER_AGENT = env(
     "COLLECTOR_USER_AGENT",
     "DND-JobConnectBot/1.0 (+https://github.com/Huma13/DND-JobConnect)",
