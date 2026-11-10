@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './auth/AuthContext.jsx'
 import DisclaimerGate from './auth/DisclaimerGate.jsx'
+import NotificationBell from './components/NotificationBell.jsx'
 import AnalyticsDashboard from './components/AnalyticsDashboard.jsx'
 import OutreachPanel from './components/OutreachPanel.jsx'
 import ReviewQueue from './components/ReviewQueue.jsx'
@@ -65,6 +66,7 @@ function Header() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          <NotificationBell />
           <span
             className="flex size-9 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700"
             title={email}
