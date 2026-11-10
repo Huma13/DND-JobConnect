@@ -24,6 +24,7 @@ def test_seed_demo_creates_feed_and_history_and_can_rerun(settings, django_user_
     assert FeedItem.objects.filter(user=user, state="new").exists()
     assert Application.objects.filter(user=user).count() == 8
     assert ApplicationResponse.objects.filter(user=user, response_type="interview").exists()
+    assert user.notifications.filter(kind="captcha").exists()
 
 
 @pytest.mark.django_db
