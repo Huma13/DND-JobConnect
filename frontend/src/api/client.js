@@ -101,6 +101,7 @@ export function errorMessage(error, fallback = 'Something went wrong. Please try
   if (!data) return error?.message === 'Network Error' ? 'Cannot reach the server. Is the backend running?' : fallback
   if (typeof data === 'string') return fallback
   if (data.detail) return String(data.detail)
+  if (data.error) return String(data.error)
   const first = Object.entries(data)[0]
   if (!first) return fallback
   const [field, value] = first
