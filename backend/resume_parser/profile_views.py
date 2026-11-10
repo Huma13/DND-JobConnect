@@ -1,5 +1,6 @@
 
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from rest_framework import generics, permissions
 
 from matching.services import rescore_feed
@@ -13,8 +14,7 @@ class ProfileDetailView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
-        profile, _ = Profile.objects.get_or_create(user=self.request.user)
-        return profile
+        return get_object_or_404(Profile, user=self.request.user)
 
     def perform_update(self, serializer):
         with transaction.atomic():
