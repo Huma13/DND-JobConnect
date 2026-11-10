@@ -452,3 +452,14 @@ def test_profile_requires_authentication():
     response = APIClient().get(PROFILE_URL)
 
     assert response.status_code == 401
+
+
+@pytest.mark.django_db
+def test_profile_endpoint_returns_404_before_any_resume():
+    from django.contrib.auth import get_user_model
+    from rest_framework.test import APIClient
+
+    new = get_user_model().objects.create_user(username="fresh@pes.edu", email="fresh@pes.edu", password="x")
+    client = APIClient()
+    client.force_authenticate(new)
+    assert client.get("/api/resume/profile/").status_code == 404
