@@ -1,56 +1,61 @@
-"""View for issue #12: profile improvement tips.
+"""Issue #12: profile improvement tips.
 
-POST /resume/tips/   (JSON body)
+POST /api/resume/tips/   (JSON body, every field optional)
     {
-      "resume_text": "...",
-      "postings": ["job description 1", "job description 2"],
-      "target_role": "backend engineer",
-      "current_headline": "",   # optional
-      "current_summary": ""     # optional
+      "target_role": "backend engineer",       # default: first preferred role
+      "resume_text": "...",                     # default: the profile's skills and qualification
+      "postings": ["job description 1", ...],   # default: the user's top feed postings
+      "current_headline": "",
+      "current_summary": ""
     }
 
-Any field left out falls back to the logged-in user's profile (if your
-profile model has resume_text / target_role / headline / summary fields).
+A DRF view so the web app's JWT login works (a plain Django view only sees session logins).
 """
-import json
+from rest_framework import status
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
 
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from matching.models import FeedItem
 
+from .models import Profile
 from .profile_tips import generate_profile_tips
 
-
-def _profile_value(user, name):
-    profile = getattr(user, "profile", None)
-    return getattr(profile, name, "") or ""
+DEFAULT_POSTINGS = 20
 
 
-@csrf_exempt  # remove if you use Django session auth with CSRF tokens
-@require_POST
+def _resume_text(profile: Profile | None) -> str:
+    if profile is None:
+        return ""
+    parts = [*profile.skills, profile.highest_qualification, *profile.preferred_roles]
+    return ", ".join(p for p in parts if p)
+
+
+def _feed_postings(user, limit: int = DEFAULT_POSTINGS) -> list[str]:
+    items = (FeedItem.objects.filter(user=user, duplicate_of__isnull=True)
+             .select_related("posting").order_by("-relevance")[:limit])
+    return [f"{i.posting.title}. {i.posting.description} {' '.join(i.posting.skills)}" for i in items]
+
+
+@api_view(["POST"])
 def profile_tips(request):
-    if not request.user.is_authenticated:
-        return JsonResponse({"error": "Login required."}, status=401)
+    data = request.data if isinstance(request.data, dict) else {}
+    profile = Profile.objects.filter(user=request.user).first()
 
-    try:
-        data = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        return JsonResponse({"error": "Invalid JSON."}, status=400)
-
-    resume_text = data.get("resume_text") or _profile_value(request.user, "resume_text")
-    target_role = data.get("target_role") or _profile_value(request.user, "target_role")
-    postings = data.get("postings") or []
-
+    target_role = data.get("target_role") or (profile.preferred_roles[0] if profile and profile.preferred_roles else "")
     if not target_role:
-        return JsonResponse({"error": "target_role is required."}, status=400)
+        return Response({"error": "target_role is required (or add a preferred role to your profile)."},
+                        status=status.HTTP_400_BAD_REQUEST)
+    postings = data.get("postings")
+    if postings is None:
+        postings = _feed_postings(request.user)
     if not isinstance(postings, list):
-        return JsonResponse({"error": "postings must be a list of strings."}, status=400)
+        return Response({"error": "postings must be a list of strings."}, status=status.HTTP_400_BAD_REQUEST)
 
     tips = generate_profile_tips(
-        resume_text=resume_text,
+        resume_text=data.get("resume_text") or _resume_text(profile),
         target_postings=[str(p) for p in postings],
         target_role=target_role,
-        current_headline=data.get("current_headline") or _profile_value(request.user, "headline"),
-        current_summary=data.get("current_summary") or _profile_value(request.user, "summary"),
+        current_headline=data.get("current_headline") or "",
+        current_summary=data.get("current_summary") or "",
     )
-    return JsonResponse(tips.to_dict())
+    return Response(tips.to_dict())

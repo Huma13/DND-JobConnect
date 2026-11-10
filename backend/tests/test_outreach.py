@@ -269,3 +269,13 @@ def test_x_messenger_sends_and_maps_errors(settings, monkeypatch):
         Client.mode = mode
         with pytest.raises(exc):
             XMessenger().send("hr", "hi")
+
+
+@pytest.mark.django_db
+def test_recruiters_include_contacts_from_merged_duplicates(api):
+    shown = make_item(api.user, ext="nk", platform="naukri", url="https://www.naukri.com/job-1", description="No contact")
+    copy = make_item(api.user, ext="li")  # the LinkedIn copy names Priya and @acme_hr
+    copy.duplicate_of = shown
+    copy.save()
+    names = {r["name"] for r in recruiters(api, shown)}
+    assert {"Priya Sharma", "@acme_hr"} <= names

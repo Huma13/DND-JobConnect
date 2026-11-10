@@ -1,3 +1,4 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
@@ -12,7 +13,8 @@ class ProfileView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        return Profile.objects.get(user=self.request.user)
+        # 404 (not 500) until the user uploads a resume or creates a profile.
+        return get_object_or_404(Profile, user=self.request.user)
 
     def perform_update(self, serializer):
         serializer.save()
