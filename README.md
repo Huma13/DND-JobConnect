@@ -179,3 +179,12 @@ gh api -X PUT repos/Huma13/DND-JobConnect/branches/main/protection --input - <<'
  "restrictions":null}
 JSON
 ```
+
+## Project documents
+
+| Document | Contents |
+|---|---|
+| [docs/deviations.md](docs/deviations.md) | What changed from the SRS, architecture and test plan, and why |
+| [docs/testing/test-report.md](docs/testing/test-report.md) | Unit, branch-coverage and system test results |
+| [docs/demo-script.md](docs/demo-script.md) | Setup, the 15-minute demo, the sprint video and likely questions |
+| [docs/retrospectives.md](docs/retrospectives.md) | What each sprint delivered, with space for the retrospective notes |
