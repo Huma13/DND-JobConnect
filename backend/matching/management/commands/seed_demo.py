@@ -85,8 +85,13 @@ class Command(BaseCommand):
         rng = random.Random(7)
         now = timezone.now()
         profile = user.profile
+        # Leave the top matches, career-page postings and postings with recruiter contacts
+        # untouched so they can be applied to live during the demo.
         items = list(FeedItem.objects.filter(user=user, duplicate_of__isnull=True)
-                     .select_related("posting").order_by("-relevance")[len(HISTORY) // 2:])
+                     .exclude(posting__url__contains="greenhouse.io")
+                     .exclude(posting__url__contains="lever.co")
+                     .exclude(posting__description__contains="linkedin.com/in/")
+                     .select_related("posting").order_by("-relevance")[2:])
         for (status, method, outcome), item in zip(HISTORY, items, strict=False):
             posting = item.posting
             when = now - timedelta(days=rng.randint(2, 20), hours=rng.randint(0, 8))
