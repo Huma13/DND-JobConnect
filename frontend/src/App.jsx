@@ -9,6 +9,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { AuthProvider, useAuth } from './auth/AuthContext.jsx'
+import DisclaimerGate from './auth/DisclaimerGate.jsx'
 import AnalyticsDashboard from './components/AnalyticsDashboard.jsx'
 import OutreachPanel from './components/OutreachPanel.jsx'
 import ReviewQueue from './components/ReviewQueue.jsx'
@@ -100,7 +101,9 @@ function Layout({ toast }) {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 antialiased">
       <Header />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <Outlet />
+        <DisclaimerGate>
+          <Outlet />
+        </DisclaimerGate>
       </main>
       <div aria-live="polite">{toast && <Toast key={toast.id} message={toast.message} />}</div>
     </div>
