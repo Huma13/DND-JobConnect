@@ -1,0 +1,365 @@
+[
+  {
+    "id": 1,
+    "platform": "linkedin",
+    "title": "Backend Engineer (Python/Django)",
+    "company": "Northwind Labs",
+    "location": "Bengaluru",
+    "days_ago": 1,
+    "skills": [
+      "Python",
+      "Django",
+      "PostgreSQL",
+      "Docker"
+    ],
+    "description": "Build REST APIs with Django and DRF. 1-3 years experience. Celery, Redis a plus.",
+    "url": "https://jobs.example.com/linkedin/1"
+  },
+  {
+    "id": 2,
+    "platform": "naukri",
+    "title": "Backend Engineer - Python/Django",
+    "company": "Northwind Labs",
+    "location": "Bengaluru",
+    "days_ago": 2,
+    "skills": [
+      "Python",
+      "Django",
+      "PostgreSQL"
+    ],
+    "description": "Python Django developer for our payments platform. 1-3 years.",
+    "url": "https://jobs.example.com/naukri/2"
+  },
+  {
+    "id": 3,
+    "platform": "x",
+    "title": "Hiring: Backend Engineer, Python + Django",
+    "company": "Northwind Labs",
+    "location": "Bengaluru",
+    "days_ago": 1,
+    "skills": [
+      "Python",
+      "Django"
+    ],
+    "description": "#hiring #python Backend role on our payments team. DM or apply via careers page.",
+    "url": "https://jobs.example.com/x/3"
+  },
+  {
+    "id": 4,
+    "platform": "linkedin",
+    "title": "Machine Learning Engineer",
+    "company": "Lumen Analytics",
+    "location": "Bengaluru",
+    "days_ago": 3,
+    "skills": [
+      "Python",
+      "PyTorch",
+      "SQL",
+      "AWS"
+    ],
+    "description": "Train and deploy ML models. 0-2 years. Strong Python and SQL.",
+    "url": "https://jobs.example.com/linkedin/4"
+  },
+  {
+    "id": 5,
+    "platform": "naukri",
+    "title": "ML Engineer - NLP",
+    "company": "Lumen Analytics",
+    "location": "Hyderabad",
+    "days_ago": 5,
+    "skills": [
+      "Python",
+      "NLP",
+      "Transformers"
+    ],
+    "description": "NLP models for document understanding. Fresher to 2 years.",
+    "url": "https://jobs.example.com/naukri/5"
+  },
+  {
+    "id": 6,
+    "platform": "linkedin",
+    "title": "Data Analyst",
+    "company": "Brightpath Retail",
+    "location": "Pune",
+    "days_ago": 4,
+    "skills": [
+      "SQL",
+      "Python",
+      "Power BI",
+      "Excel"
+    ],
+    "description": "Dashboards and analysis for retail operations. 0-2 years.",
+    "url": "https://jobs.example.com/linkedin/6"
+  },
+  {
+    "id": 7,
+    "platform": "naukri",
+    "title": "Junior Data Scientist",
+    "company": "Quanta Finserv",
+    "location": "Mumbai",
+    "days_ago": 6,
+    "skills": [
+      "Python",
+      "Pandas",
+      "Scikit-learn",
+      "SQL"
+    ],
+    "description": "Credit risk models. Freshers welcome. Python, pandas, scikit-learn.",
+    "url": "https://jobs.example.com/naukri/7"
+  },
+  {
+    "id": 8,
+    "platform": "x",
+    "title": "We're hiring a Data Scientist (0-2 yrs)",
+    "company": "Quanta Finserv",
+    "location": "Mumbai",
+    "days_ago": 2,
+    "skills": [
+      "Python",
+      "Machine Learning"
+    ],
+    "description": "#hiring #datascience Send your CV to careers@quanta.example.com",
+    "url": "https://jobs.example.com/x/8"
+  },
+  {
+    "id": 9,
+    "platform": "linkedin",
+    "title": "Full Stack Developer (React + Node)",
+    "company": "Kestrel Software",
+    "location": "Chennai",
+    "days_ago": 2,
+    "skills": [
+      "React",
+      "Node.js",
+      "JavaScript",
+      "MongoDB"
+    ],
+    "description": "React frontend and Node backend. 1-3 years.",
+    "url": "https://jobs.example.com/linkedin/9"
+  },
+  {
+    "id": 10,
+    "platform": "naukri",
+    "title": "Frontend Developer - React",
+    "company": "Kestrel Software",
+    "location": "Chennai",
+    "days_ago": 8,
+    "skills": [
+      "React",
+      "TypeScript",
+      "CSS"
+    ],
+    "description": "Build product UI in React and TypeScript.",
+    "url": "https://jobs.example.com/naukri/10"
+  },
+  {
+    "id": 11,
+    "platform": "linkedin",
+    "title": "DevOps Engineer",
+    "company": "Cirrus Cloudworks",
+    "location": "Remote",
+    "days_ago": 1,
+    "skills": [
+      "Docker",
+      "Kubernetes",
+      "AWS",
+      "CI/CD"
+    ],
+    "description": "Own CI/CD pipelines and Kubernetes clusters. 2-4 years.",
+    "url": "https://jobs.example.com/linkedin/11"
+  },
+  {
+    "id": 12,
+    "platform": "x",
+    "title": "Hiring DevOps / SRE intern",
+    "company": "Cirrus Cloudworks",
+    "location": "Remote",
+    "days_ago": 3,
+    "skills": [
+      "Linux",
+      "Docker"
+    ],
+    "description": "#hiring #devops Internship for final-year students. Email jobs@cirrus.example.com",
+    "url": "https://jobs.example.com/x/12"
+  },
+  {
+    "id": 13,
+    "platform": "naukri",
+    "title": "Software Engineer - Java",
+    "company": "Orbit Systems",
+    "location": "Bengaluru",
+    "days_ago": 10,
+    "skills": [
+      "Java",
+      "Spring Boot",
+      "MySQL"
+    ],
+    "description": "Spring Boot microservices. 0-2 years.",
+    "url": "https://jobs.example.com/naukri/13"
+  },
+  {
+    "id": 14,
+    "platform": "linkedin",
+    "title": "SDE 1 - Backend",
+    "company": "Tidewave Commerce",
+    "location": "Bengaluru",
+    "days_ago": 2,
+    "skills": [
+      "Python",
+      "Go",
+      "PostgreSQL",
+      "Redis"
+    ],
+    "description": "Backend services for checkout. Python or Go. 0-2 years.",
+    "url": "https://jobs.example.com/linkedin/14"
+  },
+  {
+    "id": 15,
+    "platform": "x",
+    "title": "SDE-1 Backend openings",
+    "company": "Tidewave Commerce",
+    "location": "Bengaluru",
+    "days_ago": 1,
+    "skills": [
+      "Python",
+      "Go"
+    ],
+    "description": "#hiring #sde Backend SDE-1 roles, apply on our careers page.",
+    "url": "https://jobs.example.com/x/15"
+  },
+  {
+    "id": 16,
+    "platform": "naukri",
+    "title": "Python Developer",
+    "company": "Saffron Health Tech",
+    "location": "Hyderabad",
+    "days_ago": 4,
+    "skills": [
+      "Python",
+      "Flask",
+      "REST",
+      "SQL"
+    ],
+    "description": "Flask APIs for a hospital platform. 1-2 years.",
+    "url": "https://jobs.example.com/naukri/16"
+  },
+  {
+    "id": 17,
+    "platform": "linkedin",
+    "title": "AI/ML Intern",
+    "company": "Pinecrest AI",
+    "location": "Bengaluru",
+    "days_ago": 1,
+    "skills": [
+      "Python",
+      "Machine Learning",
+      "Deep Learning"
+    ],
+    "description": "6-month internship for final-year students in AI/ML.",
+    "url": "https://jobs.example.com/linkedin/17"
+  },
+  {
+    "id": 18,
+    "platform": "naukri",
+    "title": "Data Engineer",
+    "company": "Brightpath Retail",
+    "location": "Pune",
+    "days_ago": 7,
+    "skills": [
+      "Python",
+      "Spark",
+      "Airflow",
+      "SQL"
+    ],
+    "description": "Batch pipelines with Spark and Airflow. 1-3 years.",
+    "url": "https://jobs.example.com/naukri/18"
+  },
+  {
+    "id": 19,
+    "platform": "linkedin",
+    "title": "QA Automation Engineer",
+    "company": "Orbit Systems",
+    "location": "Noida",
+    "days_ago": 9,
+    "skills": [
+      "Selenium",
+      "Python",
+      "Pytest"
+    ],
+    "description": "Automated UI and API tests with Selenium and pytest.",
+    "url": "https://jobs.example.com/linkedin/19"
+  },
+  {
+    "id": 20,
+    "platform": "x",
+    "title": "Hiring: Backend Developer (Django) - freshers",
+    "company": "Saffron Health Tech",
+    "location": "Hyderabad",
+    "days_ago": 2,
+    "skills": [
+      "Python",
+      "Django"
+    ],
+    "description": "#hiring #freshers Django backend role. Send CV to talent@saffron.example.com",
+    "url": "https://jobs.example.com/x/20"
+  },
+  {
+    "id": 21,
+    "platform": "linkedin",
+    "title": "Cloud Engineer - AWS",
+    "company": "Cirrus Cloudworks",
+    "location": "Hyderabad",
+    "days_ago": 6,
+    "skills": [
+      "AWS",
+      "Terraform",
+      "Python"
+    ],
+    "description": "Infrastructure as code on AWS. 1-3 years.",
+    "url": "https://jobs.example.com/linkedin/21"
+  },
+  {
+    "id": 22,
+    "platform": "naukri",
+    "title": "Machine Learning Engineer",
+    "company": "Lumen Analytics",
+    "location": "Bengaluru",
+    "days_ago": 3,
+    "skills": [
+      "Python",
+      "PyTorch",
+      "SQL"
+    ],
+    "description": "Train and deploy ML models. 0-2 years.",
+    "url": "https://jobs.example.com/naukri/22"
+  },
+  {
+    "id": 23,
+    "platform": "linkedin",
+    "title": "Business Analyst",
+    "company": "Quanta Finserv",
+    "location": "Mumbai",
+    "days_ago": 12,
+    "skills": [
+      "Excel",
+      "SQL",
+      "Communication"
+    ],
+    "description": "Requirement gathering and reporting.",
+    "url": "https://jobs.example.com/linkedin/23"
+  },
+  {
+    "id": 24,
+    "platform": "naukri",
+    "title": "Android Developer",
+    "company": "Kestrel Software",
+    "location": "Chennai",
+    "days_ago": 11,
+    "skills": [
+      "Kotlin",
+      "Android"
+    ],
+    "description": "Native Android apps in Kotlin.",
+    "url": "https://jobs.example.com/naukri/24"
+  }
+]
