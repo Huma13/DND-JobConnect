@@ -63,7 +63,10 @@ class RecruiterViewSet(mixins.ListModelMixin, mixins.CreateModelMixin, viewsets.
 
     def list(self, request, *args, **kwargs):
         item = self._item(request.query_params.get("feed_item"))
-        return Response(RecruiterSerializer(services.suggest_recruiters(item.posting), many=True).data)
+        # The same job merged from other platforms (REQ-7) may name a contact the shown copy does not.
+        postings = [item.posting, *(d.posting for d in item.duplicates.select_related("posting"))]
+        found = [r for posting in postings for r in services.suggest_recruiters(posting)]
+        return Response(RecruiterSerializer(found, many=True).data)
 
     def perform_create(self, serializer):
         item = self._item(self.request.data.get("feed_item"))

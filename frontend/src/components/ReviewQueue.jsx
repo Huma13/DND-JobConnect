@@ -1,102 +1,121 @@
 import { useEffect, useState } from 'react'
-import { CircleCheck, LoaderCircle, MapPin } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { ExternalLink, LoaderCircle, TriangleAlert } from 'lucide-react'
+import { api, errorMessage, listOf } from '../api/client.js'
+import { formatDate, platformLabel } from '../lib/format.js'
 import ReviewModal from './ReviewModal.jsx'
 
-/* ------------------------------- Mock data ------------------------------- */
+// Applications waiting for the user's confirmation (REQ-10), plus ones a CAPTCHA or an
+// error stopped (REQ-13), so nothing is left half-done.
+const WAITING = ['draft', 'manual_review_required', 'failed']
 
-const MOCK_PENDING_JOBS = [
-  { id: 1, title: 'Software Engineer II', company: 'Microsoft', platform: 'LinkedIn', location: 'Hyderabad', score: 92 },
-  { id: 2, title: 'Full Stack Developer', company: 'Freshworks', platform: 'Naukri', location: 'Chennai', score: 86 },
-  { id: 3, title: 'Backend Engineer', company: 'CRED', platform: 'X/Twitter', location: 'Bengaluru', score: 81 },
-]
+const STATUS = {
+  draft: { label: 'Waiting for review', className: 'bg-blue-50 text-blue-700' },
+  manual_review_required: { label: 'Manual review required', className: 'bg-amber-50 text-amber-800' },
+  failed: { label: 'Failed', className: 'bg-red-50 text-red-700' },
+}
 
-/* ------------------------------- Main screen ----------------------------- */
-
-// Page behind the modal: opens the first job on arrival so the demo lands on it.
 export default function ReviewQueue({ onToast }) {
-  const [jobs, setJobs] = useState(null)
-  const [activeJob, setActiveJob] = useState(null)
-  const [submittedIds, setSubmittedIds] = useState([])
+  const [apps, setApps] = useState(null)
+  const [active, setActive] = useState(null)
+  const [error, setError] = useState('')
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setJobs(MOCK_PENDING_JOBS)
-      setActiveJob(MOCK_PENDING_JOBS[0])
-    }, 700)
-    return () => clearTimeout(timer)
-  }, [])
-
-  function handleConfirmed(job) {
-    setActiveJob(null)
-    setSubmittedIds((ids) => [...ids, job.id])
-    onToast(`Application submitted to ${job.company}`)
-  }
+    let live = true
+    Promise.all(WAITING.map((s) => api.get(`/applications/?status=${s}`)))
+      .then((responses) => {
+        if (!live) return
+        const all = responses.flatMap(({ data }) => listOf(data))
+        // Manual (assisted) applications are finished on the site, not submitted from here.
+        setApps(all.filter((a) => a.method !== 'manual').sort((a, b) => b.created_at.localeCompare(a.created_at)))
+      })
+      .catch((err) => live && setError(errorMessage(err)))
+    return () => {
+      live = false
+    }
+  }, [reload])
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Applications to Review
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Applications to Review</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Nothing is submitted until you confirm it.
+          Nothing is submitted until you confirm it. Start an application from the{' '}
+          <Link to="/feed" className="text-blue-700 hover:underline">job feed</Link>.
         </p>
       </div>
+      {error && <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
 
       <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        {jobs === null ? (
+        {apps === null ? (
           <p role="status" className="flex items-center justify-center gap-2 py-20 text-sm text-slate-600">
             <LoaderCircle className="size-5 animate-spin text-blue-600" aria-hidden="true" />
-            Loading matched jobs…
+            Loading applications…
           </p>
+        ) : apps.length === 0 ? (
+          <p className="px-6 py-16 text-center text-sm text-slate-600">Nothing waiting for review.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {jobs.map((job) => (
-              <li key={job.id} className="flex flex-wrap items-center justify-between gap-3 p-5">
-                <div>
-                  <p className="font-medium text-slate-900">{job.title}</p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-slate-600">
-                    {job.company}
-                    <span aria-hidden="true">·</span>
-                    {job.platform}
-                    <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="size-3.5" aria-hidden="true" />
-                      {job.location}
-                    </span>
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 tabular-nums ring-1 ring-emerald-600/20 ring-inset">
-                    {job.score}
-                  </span>
-                  {submittedIds.includes(job.id) ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700">
-                      <CircleCheck className="size-4" aria-hidden="true" />
-                      Applied
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setActiveJob(job)}
-                      className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                    >
-                      Review
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
+            {apps.map((app) => {
+              const status = STATUS[app.status]
+              return (
+                <li key={app.id} className="flex flex-wrap items-center justify-between gap-3 p-5">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-900">{app.title}</p>
+                    <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-slate-600">
+                      {app.company}
+                      <span aria-hidden="true">·</span>
+                      {platformLabel(app.platform)}
+                      <span aria-hidden="true">·</span>
+                      {formatDate(app.created_at)}
+                    </p>
+                    {app.result?.error && (
+                      <p className="mt-1 flex items-center gap-1.5 text-sm text-red-700">
+                        <TriangleAlert className="size-3.5" aria-hidden="true" />
+                        {app.result.error}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${status.className}`}>{status.label}</span>
+                    {app.status === 'manual_review_required' ? (
+                      <a
+                        href={app.posting_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <ExternalLink className="size-4" aria-hidden="true" />
+                        Open posting
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setActive(app)}
+                        className="cursor-pointer rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                      >
+                        {app.status === 'failed' ? 'Try again' : 'Review'}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
 
-      {activeJob && (
+      {active && (
         <ReviewModal
-          key={activeJob.id}
-          job={activeJob}
-          onClose={() => setActiveJob(null)}
-          onConfirmed={handleConfirmed}
+          key={active.id}
+          application={active}
+          onClose={() => setActive(null)}
+          onSubmitted={(message) => {
+            setActive(null)
+            setReload((n) => n + 1)
+            onToast(message)
+          }}
         />
       )}
     </div>
